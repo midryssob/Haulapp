@@ -311,6 +311,11 @@ ${has?`<button class="${no===1?'pri':''}" data-act="stopdone" data-i="${i}">Hoto
 <p class="small mute">Trasa minimalizuje čas: vzdálenost ÷ rychlost QT + režie zastávky + příplatek za povrch (Nastavení). Náklad, který se nevejde, se veze na víc jízd. Vzdálenosti: UEX API, přibližné.</p></div></div>`;
 return h}
 
+/* ===== Automatické aktualizace (desktop) ===== */
+let appVer='';
+async function checkUpd(manual){const U=window.__TAURI__&&window.__TAURI__.updater;if(!U){if(manual)alertBox('Kontrola aktualizací není v této verzi dostupná.');return}
+try{const u=await U.check();if(u){ui.upd=u;render()}else if(manual)alertBox('Máš nejnovější verzi'+(appVer?' ('+appVer+')':'')+'.')}catch(e){if(manual)alertBox('Kontrolu aktualizací se nepodařilo provést: '+e)}}
+if(window.__TAURI__){try{window.__TAURI__.app.getVersion().then(v=>{appVer=v;if(tab()==='nastaveni')render()})}catch(e){}setTimeout(()=>checkUpd(false),4000)}
 /* ===== Import kontraktu z Game.log ===== */
 const GLOG_DEFAULT='C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log';
 const TA=()=>window.__TAURI__&&window.__TAURI__.core;
@@ -428,6 +433,7 @@ return`<div class="grid2"><div class="card"><h3 style="font-size:18px;margin-bot
 <label>Max box<select data-f="cl_x">${opts([[0,'neznámý'],...BOX.slice().reverse().map(b=>[b,b])],ui.logForm.cl_x||0)}</select></label>
 <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-f="cl_s" ${ui.logForm.cl_s?'checked':''} style="min-height:auto"> na povrchu</label><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-f="cl_e" ${ui.logForm.cl_e?'checked':''} style="min-height:auto"> externí výtah</label><button data-act="addloc">Přidat</button></div>
 ${(S.customLocs||[]).map(l=>`<p style="margin:8px 0 0">${esc(lbl(l))} <span class="mute small">u ${NODES[l.a]}${l.s?' · povrch':''}</span> <button class="sm danger" data-act="delloc" data-id="${l.id}">Smazat</button></p>`).join('')}</div>
+${TA()?`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Aplikace</h3><p style="margin:0 0 8px">Verze <b>${esc(appVer||'?')}</b>. Nové verze se hledají automaticky při každém spuštění.</p><button data-act="updcheck">Zkontrolovat aktualizace</button></div>`:''}
 ${TA()?`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Game.log</h3><label>Cesta k souboru Game.log<input data-set="set.glog" value="${esc(S.set.glog||GLOG_DEFAULT)}" style="width:100%"></label><p class="small mute">Výchozí instalace: ${esc(GLOG_DEFAULT)}. Soubor je ve složce LIVE vedle StarCitizen_Launcher. Aplikace ho jen čte.</p></div>`:''}
 <div class="card"><h3 style="font-size:18px;margin-bottom:8px">Záloha dat</h3>
 <div class="row" style="margin-bottom:10px"><button data-act="dl">${TAURI?'Uložit zálohu do Dokumentů':'Stáhnout zálohu (.json)'}</button><label class="small" style="flex-direction:row;align-items:center;gap:6px">Načíst ze souboru <input type="file" id="impf" accept=".json,application/json" style="min-height:auto;padding:4px"></label></div><textarea readonly id="exp">${esc(JSON.stringify(S))}</textarea><div class="row" style="margin:8px 0 14px"><button data-act="copy">Kopírovat zálohu</button><span class="small mute" id="copied"></span></div>
@@ -436,7 +442,7 @@ ${TA()?`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Game.log<
 <p class="small mute">${TAURI?`Data se průběžně ukládají do souboru <code>${esc(dataPath)}</code>. Záloha se uloží do složky Dokumenty.`:'Data se ukládají jen v tomto prohlížeči na tomto zařízení. Pro přenos jinam nebo zálohu použij Stáhnout zálohu / Načíst ze souboru.'} Lokace, maximální boxy výtahů a vzdálenosti v Gm pocházejí z <a href="https://uexcorp.space" target="_blank" rel="noopener">UEX</a> (stav listopad 2026). Označení (E) = stanice s externím nákladním výtahem (podle UEX, pole loading dock). UEX uvádí Pyro IV a Pyro V na téže pozici, proto mají v trase nulovou vzdálenost.</p>`}
 
 function render(){header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni}[t];
-document.getElementById('app').innerHTML=(S.sample?`<div class="banner">Ukázková data, aby bylo vidět, jak nástroj funguje.<button data-act="clearsample">Smazat a začít načisto</button></div>`:'')+V()}
+document.getElementById('app').innerHTML=(ui.upd?`<div class="banner" style="background:var(--ok)">Je k dispozici nová verze ${esc(ui.upd.version)}${appVer?' (máš '+esc(appVer)+')':''}.<button data-act="updnow">${ui.updBusy?'Stahuji a instaluji…':'Aktualizovat a restartovat'}</button>${ui.updBusy?'':'<button data-act="updlater">Později</button>'}</div>`:'')+(S.sample?`<div class="banner">Ukázková data, aby bylo vidět, jak nástroj funguje.<button data-act="clearsample">Smazat a začít načisto</button></div>`:'')+V()}
 
 /* ukládání: localStorage + db artefaktu */
 let db=null,saving=false,pend=false,timer=null,lastJson='',syncCls='',syncTxt='načítám…';
@@ -495,6 +501,9 @@ else if(a==='mapview'){mapView=id}
 else if(a==='setpos'){S.set.pos=id;save()}
 else if(a==='logread'&&TA()){b.textContent='Načítám…';TA().invoke('read_game_log',{path:S.set.glog||GLOG_DEFAULT}).then(handleLog).catch(e=>{ui.logMsg='Game.log se nepodařilo přečíst: '+e+'. Zkontroluj cestu v Nastavení.';ui.logCands=null;render()});return}
 else if(a==='logpick'){const c=(ui.logCands||[]).find(x=>x.id===id);if(c){ui.draft=draftFromLog(c);ui.logCands=null;scrollTo(0,0)}}
+else if(a==='updnow'&&ui.upd&&!ui.updBusy){ui.updBusy=true;render();save();ui.upd.downloadAndInstall().then(()=>window.__TAURI__.process.relaunch()).catch(e=>{ui.updBusy=false;ui.upd=null;alertBox('Aktualizace se nezdařila: '+e)});return}
+else if(a==='updlater'){ui.upd=null}
+else if(a==='updcheck'){b.textContent='Kontroluji…';checkUpd(true).then(()=>{b.textContent='Zkontrolovat aktualizace'});return}
 else if(a==='dellog'){S.log=S.log.filter(x=>x.id!==id);save()}
 else if(a==='addloc'){const f=ui.logForm;if(!f.cl_n){b.textContent='Zadej název';return}S.customLocs=S.customLocs||[];S.customLocs.push({id:'u'+uid(),n:f.cl_n,d:NODES[f.cl_a||'BL'],a:f.cl_a||'BL',x:+f.cl_x||0,s:!!f.cl_s,e:!!f.cl_e});ui.logForm={};save()}
 else if(a==='delloc'){S.customLocs=S.customLocs.filter(l=>l.id!==id);save()}

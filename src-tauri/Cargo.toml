@@ -1,6 +1,6 @@
 [package]
 name = "hauling-pyro"
-version = "1.1.0"
+version = "1.2.0"
 description = "Hauling Pyro – evidence nákladu a plánovač trasy pro Star Citizen"
 edition = "2021"
 
@@ -13,6 +13,11 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-process = "2"
+serde_json = "1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 
 [profile.release]
 codegen-units = 1

@@ -21,6 +21,16 @@ Neoficiální fanouškovský nástroj, bez vazby na Cloud Imperium Games ani Rob
 Vytvoř v repozitáři **Release** se značkou začínající `v` (např. `v1.0.0`). Sestavení pak instalátory samo přiloží k vydání na stránce *Releases* a odtud si je může stáhnout kdokoli.
 Novou verzi vydáš tak, že změníš číslo verze v `src-tauri/tauri.conf.json` a `src-tauri/Cargo.toml` a vytvoříš nový Release (např. `v1.0.1`).
 
+## Automatické aktualizace (od verze 1.2.0)
+Aplikace při každém spuštění zkontroluje, jestli na stránce *Releases* není novější verze. Pokud ano, nabídne **Aktualizovat a restartovat**. Ručně jde kontrolu spustit v Nastavení.
+
+Podmínky:
+1. Repozitář musí být **veřejný** (aplikace stahuje aktualizace bez přihlášení).
+2. V repozitáři musí být secret **`TAURI_SIGNING_PRIVATE_KEY`** s obsahem soukromého klíče (Settings → Secrets and variables → Actions → New repository secret). Klíč nemá heslo. Veřejný klíč je v `src-tauri/tauri.conf.json`.
+3. Novou verzi vydáš tak, že zvýšíš číslo verze (`src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`), nahraješ změnu a vytvoříš Release se značkou `Hauling_Pyro_X.Y.Z` (nebo `vX.Y.Z`). Sestavení k vydání přiloží instalátor, jeho podpis (`.sig`) a `latest.json`, ze kterého si aplikace aktualizaci najde.
+
+Soukromý klíč pečlivě uschovej. Při jeho ztrátě už nepůjde vydat aktualizaci, kterou by stávající instalace přijaly, a všichni by museli novou verzi nainstalovat ručně. Bez secretu se aplikace sestaví také, jen bez podepsaných aktualizací.
+
 ## Instalace a první spuštění
 - Spusť `Hauling Pyro_1.0.0_x64-setup.exe` (doporučeno), případně `.msi`.
 - Windows SmartScreen může ukázat „Systém Windows ochránil počítač“, protože instalátor není podepsaný certifikátem. Klikni na **Další informace → Přesto spustit**.
