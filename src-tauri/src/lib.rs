@@ -51,6 +51,21 @@ fn export_backup(app: tauri::AppHandle, json: String) -> Result<String, String> 
     Ok(p.display().to_string())
 }
 
+/// Načte konec Game.log (max. 8 MB) – jen čtení, soubor hry se nemění.
+#[tauri::command]
+fn read_game_log(path: String) -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = fs::File::open(&path).map_err(|e| format!("{} ({})", e, path))?;
+    let len = f.metadata().map_err(|e| e.to_string())?.len();
+    let max: u64 = 8 * 1024 * 1024;
+    if len > max {
+        f.seek(SeekFrom::Start(len - max)).map_err(|e| e.to_string())?;
+    }
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
 #[tauri::command]
 fn set_always_on_top(window: tauri::WebviewWindow, on: bool) -> Result<(), String> {
     window.set_always_on_top(on).map_err(|e| e.to_string())
@@ -64,6 +79,7 @@ pub fn run() {
             save_state,
             data_path,
             export_backup,
+            read_game_log,
             set_always_on_top
         ])
         .run(tauri::generate_context!())
