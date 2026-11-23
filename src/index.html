@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hauling Pyro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: věcný dispečink, palubní nástroj, žádná omáčka
+   IDEA: nákladní list + jízdní řád trasy (waybill a tabule zastávek)
+   PICTURE: tabule zastávek s pruhem zaplnění nákladového prostoru po každé zastávce
+   COLOUR/TYPE: popel Pyra, oranžová erupce, barvy destinací; Chakra Petch + Barlow
+   LAYOUT: lišta lodi, záložky, jedna pracovní kolona do 1100 px */
+:root{color-scheme:light dark;--bg:light-dark(#e9e5df,#141211);--panel:light-dark(#f8f5f1,#1f1c1a);--ink:light-dark(#1c1917,#efe8e0);--mute:light-dark(#6b625a,#a39a90);--line:light-dark(#d3ccc3,#36312d);--flare:light-dark(#c9410f,#ff6a33);--ok:light-dark(#2d7a4f,#5cc28a);--warn:light-dark(#9a4f06,#f0a24a);--bar:light-dark(#ddd6cd,#2c2825);--head:light-dark(#1c1917,#0c0b0a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip;font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:"Chakra Petch",Barlow,sans-serif;font-weight:700;line-height:1.1;margin:0;text-wrap:balance}
+.top{background:var(--head);color:#efe8e0;padding:14px max(4vw,14px) 0;border-bottom:4px solid var(--flare)}
+.toprow{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:end;justify-content:space-between;max-width:1100px;margin:auto}
+.top h1{font-size:clamp(24px,4vw,34px)}.top h1 span{color:#ff6a33}
+.ship{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:14px;color:#c9c0b6}
+.ship b{color:#fff;font-size:16px}
+.meter{width:150px;height:10px;background:#2c2825;border-radius:5px;overflow:hidden}.meter i{display:block;height:100%;background:#ff6a33}
+.sync{font-size:13px;color:#a39a90}.sync::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:6px}
+.sync.ok{color:#5cc28a}.pin{background:#2c2825;color:#efe8e0;border-color:#4a433d}.pin.on{background:#ff6a33;border-color:#ff6a33;color:#fff}.sync.err{color:#ff6a33}
+nav.tabs{display:flex;gap:2px;max-width:1100px;margin:12px auto 0;overflow-x:auto}
+nav.tabs a{flex:none;color:#c9c0b6;text-decoration:none;padding:10px 16px;font-weight:600;border-radius:8px 8px 0 0}
+nav.tabs a.on{background:var(--bg);color:var(--ink)}
+main{max-width:1100px;margin:auto;padding:20px max(4vw,14px) 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mute);font-weight:600}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;min-height:44px}
+textarea{width:100%;min-height:110px;font-size:13px;font-family:ui-monospace,monospace}
+input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--flare);outline-offset:1px}
+input[type=number]{width:96px}
+button{font:inherit;font-weight:600;min-height:44px;padding:8px 14px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.pri{background:var(--flare);border-color:var(--flare);color:#fff}
+button.sm{min-height:34px;padding:4px 10px;font-size:14px}
+button.danger{color:var(--flare)}
+.mute{color:var(--mute)}.small{font-size:13px}
+.sum{display:flex;flex-wrap:wrap;gap:8px 28px;margin:4px 0 16px}
+.sum div{font-size:13px;color:var(--mute)}.sum b{display:block;font:700 clamp(22px,3.4vw,30px)/1.1 "Chakra Petch",sans-serif;color:var(--ink)}
+.sum b.save{color:var(--ok)}
+.warn{border-left:4px solid var(--warn);padding:8px 12px;background:var(--panel);margin:6px 0;border-radius:0 7px 7px 0;font-size:15px}
+.stops{list-style:none;margin:0;padding:0;position:relative}
+.stop{display:grid;grid-template-columns:52px minmax(0,1fr);gap:0 14px;position:relative;padding-bottom:6px}
+.stop::before{content:"";position:absolute;left:25px;top:52px;bottom:-4px;width:4px;background:var(--line)}
+.stop:last-child::before{display:none}
+.num{width:52px;height:52px;border-radius:50%;background:var(--head);color:#fff;display:grid;place-items:center;font:700 22px "Chakra Petch",sans-serif;position:relative;z-index:1;border:3px solid var(--flare)}
+.stop.start .num{background:var(--panel);color:var(--ink);border-color:var(--line);font-size:13px}
+.leg{font-size:13px;color:var(--mute);margin:2px 0 6px}
+.stop h3{font-size:22px}.stop h3 small{font:500 14px Barlow,sans-serif;color:var(--mute);margin-left:6px}
+.act{display:flex;gap:8px;align-items:baseline;padding:5px 0 5px 10px;border-left:6px solid var(--c,#888);margin:5px 0;flex-wrap:wrap}
+.act .tag{font:700 12px "Chakra Petch",sans-serif;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tag.out{background:var(--ink);color:var(--bg)}.tag.in{background:var(--flare);color:#fff}
+.act b{white-space:nowrap}
+.load{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute);margin:6px 0 4px}
+.load .meter{background:var(--bar);flex:1;max-width:320px}.load .meter i{background:var(--flare)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-size:12px;color:var(--mute);font-weight:600;border-bottom:1px solid var(--line);padding:6px}
+td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--bar);white-space:nowrap}
+.pill.open{background:var(--flare);color:#fff}.pill.paid{background:var(--ok);color:#fff}
+.chead{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.chead h3{font-size:20px}
+.boxes{display:flex;gap:4px;flex-wrap:wrap}.boxes input{width:62px;padding:6px;min-height:40px}
+.bx{display:inline-block;font-size:12px;padding:1px 6px;border:1px solid var(--line);border-radius:4px;margin:0 3px 3px 0;white-space:nowrap}
+.line{border:1px dashed var(--line);border-radius:8px;padding:10px;margin:10px 0}
+.dest{border-left:8px solid var(--c);padding-left:12px;margin:12px 0}
+.banner{background:var(--warn);color:#fff;padding:8px 14px;border-radius:8px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.banner button{min-height:34px;padding:4px 10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.scroll{overflow-x:auto}a{color:var(--flare)}
+
+.tw{display:grid;gap:18px;align-items:start}
+@media(min-width:900px){.tw{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.mapc{position:sticky;top:12px}}
+.map{display:block;width:100%;aspect-ratio:1;background:radial-gradient(circle at 50% 50%,light-dark(#f3ece4,#1d1714),light-dark(#e2dbd2,#0f0d0c) 70%);border-radius:10px;border:1px solid var(--line);touch-action:manipulation}
+.map text{font-family:Barlow,sans-serif;fill:var(--ink);paint-order:stroke;stroke:light-dark(#efe9e2,#141110);stroke-linejoin:round}
+.map .pl{fill:var(--mute)}.map .orb{fill:none;stroke:var(--line)}.map .st{fill:var(--panel);stroke:var(--ink)}.map .st.on{fill:var(--flare);stroke:var(--flare)}
+.map .rt{fill:none;stroke:var(--flare);stroke-linejoin:round;stroke-linecap:round}.map .tr{fill:none;stroke:var(--mute);stroke-dasharray:4 4}
+.map .nb{fill:var(--head);stroke:var(--flare)}.map .nt{fill:#fff;stroke:none;font-family:"Chakra Petch",sans-serif;font-weight:700}
+.map .me{fill:none;stroke:var(--flare)}.map .clk{cursor:pointer}
+@media(prefers-reduced-motion:no-preference){.map .pulse{animation:pu 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes pu{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(1.8)}}}
+.seg{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6.5em;margin-inline-start:-7em;color:var(--mute);font-size:12px}.stack td:empty{display:none}.stop{grid-template-columns:40px minmax(0,1fr)}.num{width:40px;height:40px;font-size:18px}.stop::before{left:18px;top:40px}}
+@media(prefers-reduced-motion:no-preference){.load .meter i,.top .meter i{transition:width .4s}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head><body>
+<header class="top"><div class="toprow">
+<h1>Hauling <span>Pyro</span></h1>
+<div class="ship" id="shipbar"></div>
+</div>
+<nav class="tabs" id="tabs"></nav></header>
+<main id="app"></main>
+<footer style="max-width:1100px;margin:0 auto;padding:0 max(4vw,14px) 30px;font-size:13px;color:var(--mute)">Hauling Pyro je neoficiální fanouškovský nástroj pro Star Citizen, nemá vazbu na Cloud Imperium Games ani Roberts Space Industries. Lokace, velikosti výtahů a vzdálenosti: <a href="https://uexcorp.space" target="_blank" rel="noopener">Powered by UEX</a> (stav listopad 2026, přibližné). Data zůstávají ve tvém počítači.</footer>
+<script>
+{
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const fmt=n=>Math.round(n).toLocaleString('cs-CZ');
+const BOX=[32,24,16,8,4,2,1];
+const GIVERS=['Citizens for Prosperity','Headhunters','Covalex Shipping','Ling Family Hauling','Red Wind Linehaul','Jiný'];
+const TYPES=['Direct','Planetary','Solar','Interstellar'];
+const STATUS={open:'Aktivní',paid:'Odevzdáno',fail:'Selhalo',nospawn:'Nespawnulo',cancel:'Zrušeno'};
+const COMM=['Agricium','Aluminum','Beryl','Carbon','Copper','Corundum','Diamond','Gold','Hephaestanite','Hydrogen Fuel','Iron','Laranite','Medical Supplies','Pressurized Ice','Processed Food','Quantum Fuel','Quartz','Scrap','Ship Ammunition','Silicon','Stims','Tin','Titanium','Tungsten','Waste','Water'];
+const COLORS=['#e4572e','#2e86ab','#a23b72','#3b8f5a','#c79a1d','#6a4c93','#1b998b','#8d6346','#d1495b','#00798c'];
+const TABS=[['trasa','Trasa'],['kontrakty','Kontrakty'],['manifest','Manifest'],['zaznamy','Záznamy'],['nastaveni','Nastavení']];
+/* lokace: id, název, skupina, detail, kotva (uzel matice), max box výtahu (0 = neznámý), povrch */
+const LRAW=[
+['ruin','Ruin Station','Stanice','Terminus · orbita','T',32,0,1],['orbit','Orbituary','Stanice','Bloom · orbita','BL',32,0,1],
+['check','Checkmate Station','Stanice','Monox L4','CM',32,0,1],['patch','Patch City','Stanice','Bloom L3','PC',32,0],
+['starl','Starlight Service Station','Stanice','Bloom L1','SL',32,0],['gas','Gaslight','Stanice','Pyro V L2','GL',32,0,1],
+['rats',"Rat's Nest",'Stanice','Pyro V L5','RN',32,0],['rods',"Rod's Fuel 'N Supplies",'Stanice','Pyro V L4','RF',32,0],
+['endg','Endgame','Stanice','Terminus L3','EG',32,0],['megu','Megumi Refueling','Stanice','Terminus L5','MG',32,0,1],
+['dud','Dudley & Daughters','Stanice','Terminus L4','DD',32,0],['sgw','Stanton Gateway','Stanice','jump point','SG',32,0,1],
+['ngw','Nyx Gateway','Stanice','jump point','NG',32,0,1],
+['rust','Rustville','Pyro I','povrch','P1',16,1],['gray','Gray Gardens Depot','Pyro I','povrch','P1',0,1],
+['jack',"Jackson's Swap",'Monox','povrch','MX',16,1],['sunset','Sunset Mesa','Monox','povrch','MX',16,1],['slow','Slowburn Depot','Monox','povrch','MX',16,1],['arid','Arid Reach','Monox','povrch','MX',0,1],
+['bueno','Bueno Ravine','Bloom','povrch','BL',16,1],['shep',"Shepherd's Rest",'Bloom','povrch','BL',32,1],['gold','The Golden Riviera','Bloom','povrch','BL',24,1],['prosp','Prospect Depot','Bloom','povrch','BL',16,1],
+['ding',"Dinger's Depot",'Pyro IV','povrch','P4',16,1],['fallow','Fallow Field','Pyro IV','povrch','P4',24,1],['chawla',"Chawla's Beach",'Pyro IV','povrch','P4',16,1],
+['sacren',"Sacren's Plot",'Pyro V a měsíce','Pyro V','P5',16,1],['ash','Ashland','Pyro V a měsíce','Ignis','P5',32,1],['seer',"Seer's Canyon",'Pyro V a měsíce','Vatra','P5',16,1],['feo','Feo Canyon Depot','Pyro V a měsíce','Fairo','P5',16,1],
+['lastl','Last Landings','Terminus','povrch','T',16,1],['canard','Canard View','Terminus','povrch','T',16,1],['watch',"Watcher's Depot",'Terminus','povrch','T',16,1],['scarp',"Scarper's Turn",'Terminus','povrch','T',16,1],['roughl','Rough Landing','Terminus','povrch','T',0,1],['black','Blackrock Exchange','Terminus','povrch','T',0,1]];
+const BUILTIN=LRAW.map(([id,n,g,d,a,x,s,e])=>({id,n,g,d,a,x,s:!!s,e:!!e}));
+const lbl=l=>l?l.n+(l.e?' (E)':''):'?';
+const NODES={S:'hvězda Pyro',P1:'Pyro I',MX:'Monox',CM:'Monox L4',PC:'Bloom L3',BL:'Bloom',SL:'Bloom L1',P4:'Pyro IV',P5:'Pyro V',GL:'Pyro V L2',RN:'Pyro V L5',RF:'Pyro V L4',T:'Terminus',EG:'Terminus L3',MG:'Terminus L5',DD:'Terminus L4',SG:'Stanton Gateway',NG:'Nyx Gateway'};
+/* vzdálenosti v Gm podle UEX API 2.0 (orbits_distances, Pyro) */
+const RAW='T-P5:101,T-BL:52,T-MX:79,T-P1:65,T-S:68,T-DD:78,T-RN:56,T-SL:54,T-CM:77,T-PC:86,T-RF:108,T-EG:136,T-SG:83,T-MG:78,T-P4:102,P5-DD:60,P5-RN:52,P5-BL:52,P5-SL:50,P5-MG:110,P5-SG:92,P5-PC:37,P5-MX:35,P5-RF:55,P5-EG:56,P5-CM:44,P5-GL:4,P5-P1:41,P5-P4:0,P5-S:43,P4-BL:52,P4-CM:45,P4-DD:60,P4-EG:56,P4-GL:4,P4-MG:110,P4-MX:36,P4-PC:38,P4-S:43,P4-P1:41,P4-RN:53,P4-RF:56,P4-SG:92,P4-SL:51,BL-CM:28,BL-DD:59,BL-EG:86,BL-GL:56,BL-MG:71,BL-MX:28,BL-PC:35,BL-S:18,BL-P1:13,BL-RN:30,BL-RF:61,BL-SG:60,BL-SL:2,P1-CM:19,P1-DD:60,P1-EG:73,P1-GL:45,P1-MG:74,P1-MX:15,P1-PC:24,P1-S:8,P1-RN:35,P1-RF:50,P1-SG:60,P1-SL:11,MX-CM:9,MX-DD:71,MX-EG:58,MX-GL:40,MX-MG:74,MX-PC:9,MX-S:11,MX-RN:48,MX-RF:35,MX-SG:57,MX-SL:26,CM-DD:78,CM-EG:60,CM-GL:48,CM-MG:65,CM-PC:10,CM-S:11,CM-RN:53,CM-RF:33,CM-SG:48,CM-SL:26,PC-DD:79,PC-EG:51,PC-GL:41,PC-MG:74,PC-S:18,PC-RN:57,PC-RF:27,PC-SG:55,PC-SL:34,SL-DD:59,SL-EG:84,SL-GL:55,SL-MG:70,SL-S:16,SL-RN:31,SL-RF:59,SL-SG:59,MG-DD:128,MG-EG:108,MG-GL:114,MG-S:68,MG-RN:99,MG-RF:74,MG-SG:22,SG-DD:119,SG-EG:87,SG-GL:96,SG-S:53,SG-RN:90,SG-RF:52,RF-DD:105,RF-EG:35,RF-GL:58,RF-S:43,RF-RN:84,EG-DD:115,EG-GL:57,EG-S:68,EG-RN:101,DD-GL:61,DD-S:68,DD-RN:29,RN-GL:55';
+const NK=Object.keys(NODES),DM={},KN={};
+NK.forEach(a=>{DM[a]={};KN[a]={};NK.forEach(b=>{DM[a][b]=a===b?0:Infinity;KN[a][b]=a===b})});
+RAW.split(',').forEach(p=>{const[k,v]=p.split(':'),[a,b]=k.split('-');DM[a][b]=DM[b][a]=+v;KN[a][b]=KN[b][a]=true});
+for(const k of NK)for(const i of NK)for(const j of NK){const v=DM[i][k]+DM[k][j];if(v<DM[i][j])DM[i][j]=v}
+const gm=(a,b)=>{const v=DM[a]?.[b];return v===undefined||v===Infinity?{v:60,est:true}:{v,est:!KN[a][b]}};
+
+const LS='hauling-pyro-v1';
+function sample(){const t=Date.now();return{v:1,sample:true,seq:3,ship:{name:'Ukázková loď',cap:96,maxBox:16},set:{speed:10,stop:6,surf:4,pos:'check',end:''},customLocs:[],
+contracts:[{id:'c1',no:1,giver:'Citizens for Prosperity',type:'Planetary',reward:48500,maxBox:8,acc:t,limit:90,server:'',note:'',status:'open'},{id:'c2',no:2,giver:'Citizens for Prosperity',type:'Solar',reward:31000,maxBox:16,acc:t,limit:0,server:'',note:'',status:'open'},{id:'c3',no:3,giver:'Headhunters',type:'Solar',reward:62000,maxBox:16,acc:t,limit:0,server:'',note:'nelegální',status:'open'}],
+orders:[{id:'o1',cid:'c1',com:'Processed Food',from:'check',to:'patch',scu:24,boxes:{8:3}},{id:'o2',cid:'c1',com:'Stims',from:'check',to:'rods',scu:16,boxes:{8:2}},{id:'o3',cid:'c2',com:'Hydrogen Fuel',from:'starl',to:'ruin',scu:32,boxes:{16:2}},{id:'o4',cid:'c3',com:'Scrap',from:'orbit',to:'dud',scu:48,boxes:{16:3}}],
+log:[{id:'l1',t:t-6e5,oid:'o1',act:'load',scu:16,loc:'check',note:''}]}}
+function empty(){return{v:1,seq:0,ship:{name:'Moje loď',cap:96,maxBox:16},set:{speed:10,stop:6,surf:4,pos:'check',end:''},customLocs:[],contracts:[],orders:[],log:[]}}
+let S;try{S=JSON.parse(localStorage.getItem(LS))}catch(e){}
+if(!S||!S.v)S=sample();
+const ui={draft:null,confirm:null,logForm:{}};
+
+const locs=()=>BUILTIN.concat((S.customLocs||[]).map(l=>({...l,g:'Vlastní'})));
+const locMap=()=>Object.fromEntries(locs().map(l=>[l.id,l]));
+const C=id=>S.contracts.find(c=>c.id===id);
+const O=id=>S.orders.find(o=>o.id===id);
+const lname=id=>lbl(locMap()[id]);
+const colorFor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return COLORS[h%COLORS.length]};
+function ov(o){let L=0,U=0,X=0;for(const e of S.log)if(e.oid===o.id){if(e.act==='load')L+=+e.scu;else if(e.act==='unload')U+=+e.scu;else X+=+e.scu}
+return{...o,L,U,X,onboard:Math.max(0,L-U-X),toPick:Math.max(0,o.scu-L),done:U+X>=o.scu}}
+const activeOrders=()=>S.orders.filter(o=>C(o.cid)?.status==='open');
+const maxBoxOf=o=>{const b=BOX.find(s=>+(o.boxes||{})[s]>0);return b||0};
+const boxSum=b=>BOX.reduce((a,s)=>a+s*(+(b||{})[s]||0),0);
+const boxStr=b=>BOX.filter(s=>+(b||{})[s]>0).map(s=>`<span class="bx">${b[s]}× ${s}</span>`).join('')||'<span class="mute small">neuvedeno</span>';
+const autoBoxes=(scu,max)=>{const r={};let rem=+scu||0;for(const s of BOX){if(s>max)continue;const n=Math.floor(rem/s);if(n){r[s]=n;rem-=n*s}}return r};
+const onboardNow=()=>activeOrders().reduce((a,o)=>a+ov(o).onboard,0);
+const remain=c=>c.limit?Math.round((c.acc+c.limit*6e4-Date.now())/6e4):null;
+
+function leg(a,b){if(!a||!b||a.id===b.id)return{gm:0,min:0,est:false};const g=gm(a.a,b.a);const sp=Math.max(1,+S.set.speed||10);
+return{gm:g.v,min:g.v/sp+(+S.set.stop||0)+(b.s?(+S.set.surf||0):0),est:g.est}}
+
+function buildJobs(){const cap=Math.max(1,+S.ship.cap||1),jobs=[];
+for(const o of activeOrders()){const v=ov(o);if(v.onboard>0)jobs.push({oid:o.id,scu:v.onboard,st:1,from:o.from,to:o.to});
+let rest=v.toPick;while(rest>0){const q=Math.min(rest,cap);jobs.push({oid:o.id,scu:q,st:0,from:o.from,to:o.to});rest-=q}}return jobs}
+
+function solve(){const jobs=buildJobs(),n=jobs.length,cap=Math.max(1,+S.ship.cap||1),LM=locMap();
+const start=LM[S.set.pos]?S.set.pos:'check',end=LM[S.set.end]?S.set.end:'';
+const memo={},lc=(a,b)=>memo[a+'>'+b]||(memo[a+'>'+b]=leg(LM[a],LM[b]));
+const apply=(loc,s0)=>{const st=s0.slice();let on=0;const drops=[],picks=[];
+for(let i=0;i<n;i++)if(st[i]===1)on+=jobs[i].scu;
+for(let i=0;i<n;i++)if(st[i]===1&&jobs[i].to===loc){st[i]=2;on-=jobs[i].scu;drops.push(i)}
+const cand=[];for(let i=0;i<n;i++)if(st[i]===0&&jobs[i].from===loc)cand.push(i);
+cand.sort((x,y)=>jobs[y].scu-jobs[x].scu);for(const i of cand)if(on+jobs[i].scu<=cap){st[i]=1;on+=jobs[i].scu;picks.push(i)}
+return{st,drops,picks,on}};
+const targets=st=>{const s=new Set();for(let i=0;i<n;i++){if(st[i]===0)s.add(jobs[i].from);else if(st[i]===1)s.add(jobs[i].to)}return[...s]};
+const done=st=>st.every(x=>x===2);
+const a0=apply(start,jobs.map(j=>j.st));
+let path=null,exact=true;
+if(n){const heap=[],push=x=>{heap.push(x);let i=heap.length-1;while(i){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p}},
+pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m}}return top};
+const best=new Map(),info=new Map(),key=(l,st)=>l+'|'+st.join('');
+const k0=key(start,a0.st);best.set(k0,0);info.set(k0,{prev:null,loc:start,st:a0.st,drops:a0.drops,picks:a0.picks,on:a0.on,g:0});push([0,k0]);
+let goal=null,pops=0;const T0=Date.now();
+while(heap.length){const[g,k]=pop();if(g>best.get(k))continue;if(++pops%2000===0&&Date.now()-T0>1200)break;
+if(k==='END'){goal=k;break}const I=info.get(k);
+if(done(I.st)){if(!end||end===I.loc){goal=k;break}const g2=g+lc(I.loc,end).min;if(g2<(best.get('END')??Infinity)){best.set('END',g2);info.set('END',{prev:k,loc:end,st:I.st,drops:[],picks:[],on:0,g:g2});push([g2,'END'])}continue}
+for(const t of targets(I.st)){if(t===I.loc)continue;const r=apply(t,I.st);if(!r.drops.length&&!r.picks.length)continue;
+const g2=g+lc(I.loc,t).min,k2=key(t,r.st);if(g2<(best.get(k2)??Infinity)){best.set(k2,g2);info.set(k2,{prev:k,loc:t,st:r.st,drops:r.drops,picks:r.picks,on:r.on,g:g2});push([g2,k2])}}}
+if(goal){path=[];for(let k=goal;k;k=info.get(k).prev)path.unshift(info.get(k))}
+else{exact=false;/* beam search: v každém kroku necháme nejlepších W stavů */
+const W=4000;let beam=[{loc:start,st:a0.st,g:0,hist:[{loc:start,drops:a0.drops,picks:a0.picks,on:a0.on,g:0}]}],fin=null;
+for(let depth=0;depth<4*n+4&&beam.length;depth++){const nx=new Map();
+for(const B of beam){if(done(B.st)){const g2=B.g+(end&&end!==B.loc?lc(B.loc,end).min:0);if(!fin||g2<fin.g){fin={g:g2,hist:end&&end!==B.loc?B.hist.concat([{loc:end,drops:[],picks:[],on:0,g:g2}]):B.hist}}continue}
+for(const t of targets(B.st)){if(t===B.loc)continue;const r=apply(t,B.st);if(!r.drops.length&&!r.picks.length)continue;const g2=B.g+lc(B.loc,t).min,k2=key(t,r.st);
+const ex=nx.get(k2);if(!ex||g2<ex.g)nx.set(k2,{loc:t,st:r.st,g:g2,hist:B.hist.concat([{loc:t,drops:r.drops,picks:r.picks,on:r.on,g:g2}])})}}
+beam=[...nx.values()].sort((x,y)=>x.g-y.g).slice(0,W)}
+path=fin?fin.hist:[{loc:start,drops:a0.drops,picks:a0.picks,on:a0.on,g:0}]}}
+else path=[{loc:start,drops:[],picks:[],on:0,g:0}];
+let gmT=0,est=false;const stops=path.map((p,i)=>{const l=i?lc(path[i-1].loc,p.loc):{gm:0,min:0,est:false};gmT+=l.gm;est=est||l.est;return{...p,leg:l}});
+// srovnání: kontrakty postupně jeden po druhém
+let seq=[start];for(const j of jobs){if(j.st===0)seq.push(j.from);seq.push(j.to)}if(end)seq.push(end);
+let naive=0;for(let i=1;i<seq.length;i++)naive+=lc(seq[i-1],seq[i]).min;
+return{jobs,stops,total:path[path.length-1].g,gmT,est,exact,naive,cap}}
+
+function warnings(){const w=[],LM=locMap(),cap=+S.ship.cap||0,smax=+S.ship.maxBox||0;
+for(const c of S.contracts.filter(c=>c.status==='open')){const r=remain(c);if(r!==null&&r<0)w.push(`K${c.no}: časový limit vypršel.`);else if(r!==null&&r<20)w.push(`K${c.no}: zbývá ${r} min do limitu.`);
+if(+c.maxBox>smax)w.push(`K${c.no}: kontrakt používá boxy až ${c.maxBox} SCU, loď pojme max ${smax} SCU.`)}
+for(const o of activeOrders()){const c=C(o.cid),mb=maxBoxOf(o),v=ov(o);if(v.done)continue;
+if(mb>smax)w.push(`K${c.no} ${esc(o.com)}: box ${mb} SCU se nevejde do gridu lodi (max ${smax}).`);
+for(const id of[o.from,o.to]){const l=LM[id];if(l&&l.x&&mb>l.x)w.push(`K${c.no} ${esc(o.com)}: výtah ${esc(lbl(l))} bere max ${l.x} SCU boxy.`)}
+if(o.scu>cap&&v.toPick>0)w.push(`K${c.no} ${esc(o.com)}: ${o.scu} SCU je víc než kapacita lodi, trasa ho rozdělí na ${Math.ceil(v.toPick/cap)} jízdy.`);
+const bs=boxSum(o.boxes);if(bs&&bs!==+o.scu)w.push(`K${c.no} ${esc(o.com)}: rozpis boxů (${bs} SCU) nesedí s množstvím ${o.scu} SCU.`)}
+return w}
+
+function locSelect(name,val,opt={}){const groups={};for(const l of locs())(groups[l.g]=groups[l.g]||[]).push(l);
+return`<select ${name}>${opt.empty?`<option value="">${opt.empty}</option>`:''}${Object.entries(groups).map(([g,ls])=>`<optgroup label="${esc(g)}">${ls.map(l=>`<option value="${l.id}"${l.id===val?' selected':''}>${esc(lbl(l))}${l.d&&l.g!=='Stanice'?' · '+esc(l.d):''}</option>`).join('')}</optgroup>`).join('')}</select>`}
+const opts=(arr,val)=>arr.map(a=>{const[v,t]=Array.isArray(a)?a:[a,a];return`<option value="${esc(v)}"${String(v)===String(val)?' selected':''}>${esc(t)}</option>`}).join('');
+
+function header(){const on=onboardNow(),cap=+S.ship.cap||1;
+document.getElementById('shipbar').innerHTML=`<span><b>${esc(S.ship.name)}</b> · ${cap} SCU · box max ${S.ship.maxBox}</span><span>Na palubě <b>${on}</b> / ${cap} SCU</span><span class="meter"><i style="width:${Math.min(100,on/cap*100)}%"></i></span><span class="sync ${syncCls}" id="sync">${syncTxt}</span>${TAURI?`<button class="sm pin${onTop?' on':''}" data-act="ontop" title="Okno vždy navrchu (nad hrou v režimu borderless)">${onTop?'Navrchu: zap':'Navrchu: vyp'}</button>`:''}`;
+const cur=tab();document.getElementById('tabs').innerHTML=TABS.map(([h,t])=>`<a href="#${h}" class="${h===cur?'on':''}">${t}</a>`).join('')}
+const tab=()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)?h:'trasa'};
+
+function actLine(jobs,idxs,kind){const by={};for(const i of idxs){const j=jobs[i];by[j.oid]=(by[j.oid]||0)+j.scu}
+return Object.entries(by).map(([oid,scu])=>{const o=O(oid),c=C(o.cid);const part=scu<o.scu?` <span class="mute small">(část z ${o.scu})</span>`:'';
+return`<div class="act" style="--c:${colorFor(o.to)}"><span class="tag ${kind==='out'?'out':'in'}">${kind==='out'?'VYLOŽIT':'NALOŽIT'}</span><b>${scu} SCU</b> ${esc(o.com)}${part} <span class="mute small">K${c.no} · ${kind==='out'?'z '+esc(lname(o.from)):'→ '+esc(lname(o.to))}</span>${kind==='in'&&scu===o.scu?' '+boxStr(o.boxes):''}</div>`}).join('')}
+
+/* 2D polohy uzlů v Gm, dopočítané z matice vzdáleností UEX (stress-majorizace, chyba ~0,2 Gm). Otočeno o 135° doleva podle hry; Nyx Gateway umístěna ručně na 2/5 cesty Dudley & Daughters → Pyro V. */
+const POS={BL:[-16.1,-7.6],CM:[10.7,1.0],DD:[-61.9,28.6],EG:[52.2,44.0],GL:[-4.1,47.1],MG:[28.8,-61.9],MX:[6.3,8.8],P1:[-7.7,2.4],P4:[-3.5,43.4],P5:[-3.9,42.5],PC:[14.6,10.4],RF:[41.6,11.0],RN:[-42.0,7.2],S:[0.0,0.0],SG:[34.2,-40.8],SL:[-14.4,-6.7],T:[-48.4,-48.3],NG:[-38.7,34.2]};
+for(const n of NK)if(n!=='NG'&&POS[n]){const d=Math.round(Math.hypot(POS.NG[0]-POS[n][0],POS.NG[1]-POS[n][1]));if(DM.NG[n]===Infinity){DM.NG[n]=DM[n].NG=d}}
+const PLANETS=['P1','MX','BL','P5','P4','T'];
+let mapView='route';
+function locPos(id){const l=locMap()[id];if(!l||!POS[l.a])return null;const p=POS[l.a];if(!l.s)return p;let hh=0;for(const ch of id)hh=(hh*31+ch.charCodeAt(0))>>>0;const an=(hh%360)*Math.PI/180;return[p[0]+Math.cos(an)*1.8,p[1]+Math.sin(an)*1.8]}
+function trail(){const pts=[];for(const e of S.log.slice().sort((a,b)=>a.t-b.t)){if(pts[pts.length-1]!==e.loc)pts.push(e.loc)}if(pts[pts.length-1]!==S.set.pos)pts.push(S.set.pos);return pts.slice(-8)}
+function mapSVG(R){const LM=locMap(),route=R?R.stops.map(s=>s.loc):[S.set.pos],tr=trail();
+let vb;if(mapView==='all')vb=[-86,-86,172,172];else if(mapView==='inner')vb=[-40,-40,80,80];
+else{const pts=[...route,...tr].map(locPos).filter(Boolean);let x0=Math.min(...pts.map(p=>p[0])),x1=Math.max(...pts.map(p=>p[0])),y0=Math.min(...pts.map(p=>p[1])),y1=Math.max(...pts.map(p=>p[1]));
+const sz=Math.max(34,x1-x0,y1-y0)+22,cx=(x0+x1)/2,cy=(y0+y1)/2;vb=[cx-sz/2,cy-sz/2,sz,sz]}
+const k=vb[2]/100,fs=2.6*k,inRoute=new Set([...route,...tr]);
+/* jednoduché rozmístění popisků bez překryvu */
+const boxes=[],out=b=>b[0]<vb[0]+.5*k||b[2]>vb[0]+vb[2]-.5*k||b[1]<vb[1]+.5*k||b[3]>vb[1]+vb[3]-.5*k,hit=(b)=>out(b)||boxes.some(o=>b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1]);
+const ob=(x,y,r)=>boxes.push([x-r,y-r,x+r,y+r]);
+const tw=(t,size)=>t.length*size*.5;
+function lab(x,y,t,size,force,off){if(x<vb[0]||x>vb[0]+vb[2]||y<vb[1]||y>vb[1]+vb[3])return null;const w=tw(t,size),c=[[off,0,'start'],[-off,0,'end'],[0,-off-size*.2,'middle'],[0,off+size*.8,'middle'],[off*.8,-off,'start'],[-off*.8,-off,'end'],[off*.8,off+size*.6,'start'],[-off*.8,off+size*.6,'end']];
+for(const[dx,dy,an]of c){const X=x+dx,Y=y+dy+size*.35,x0=an==='start'?X:an==='end'?X-w:X-w/2,bx=[x0,Y-size*.85,x0+w,Y+size*.2];if(!hit(bx)){boxes.push(bx);return{X,Y,an}}}
+if(!force)return null;let bestL=null,bs=Infinity;const ov=bx=>boxes.reduce((s,o)=>s+Math.max(0,Math.min(bx[2],o[2])-Math.max(bx[0],o[0]))*Math.max(0,Math.min(bx[3],o[3])-Math.max(bx[1],o[1])),0)+(out(bx)?1e6:0);
+for(const m of[1,1.8,2.6])for(const[dx,dy,an]of c){const X=x+dx*m,Y=y+dy*m+size*.35,x0=an==='start'?X:an==='end'?X-w:X-w/2,bx=[x0,Y-size*.85,x0+w,Y+size*.2],sc=ov(bx)*(m>1?1.3:1);if(sc<bs){bs=sc;bestL={X,Y,an,bx}}}
+boxes.push(bestL.bx);return bestL}
+const txt=(L,t,size,bold)=>L?`<text x="${L.X.toFixed(2)}" y="${L.Y.toFixed(2)}" font-size="${size}" stroke-width="${.7*k}" text-anchor="${L.an}"${bold?' font-weight="600"':''}>${esc(t)}</text>`:'';
+let s=`<svg class="map" viewBox="${vb.map(v=>v.toFixed(2)).join(' ')}" role="img" aria-label="Mapa systému Pyro s trasou"><title>Mapa systému Pyro</title>`;
+s+=PLANETS.filter(n=>n!=='P4').map(n=>`<circle class="orb" cx="0" cy="0" r="${Math.hypot(...POS[n]).toFixed(1)}" stroke-width="${.25*k}" stroke-dasharray="${k} ${k}"/>`).join('');
+s+=`<circle cx="0" cy="0" r="${2.4*k}" fill="var(--flare)" opacity=".25"/><circle cx="0" cy="0" r="${1.3*k}" fill="var(--flare)"/>`;ob(0,0,1.6*k);
+const stations=locs().filter(l=>!l.s&&POS[l.a]);
+PLANETS.forEach(n=>ob(...POS[n],1.6*k));stations.forEach(l=>ob(...POS[l.a],1.3*k));
+const me=locPos(S.set.pos);if(me)ob(me[0],me[1],3.4*k);
+const pl=pts=>pts.map(locPos).filter(Boolean).map(p=>p.map(v=>v.toFixed(2)).join(',')).join(' ');
+if(tr.length>1)s+=`<polyline class="tr" points="${pl(tr)}" stroke-width="${.4*k}" stroke-dasharray="${1.2*k} ${1.2*k}"/>`;
+if(route.length>1)s+=`<polyline class="rt" points="${pl(route)}" stroke-width="${.8*k}"/>`;
+s+=PLANETS.map(n=>`<circle class="pl" cx="${POS[n][0]}" cy="${POS[n][1]}" r="${1.5*k}"/>`).join('');
+let top='',st='',lt='';
+for(const n of PLANETS)lt+=txt(lab(...POS[n],NODES[n],fs,true,2.6*k),NODES[n],fs,true);
+/* čísla zastávek */
+if(R){const at={};let no=0;R.stops.forEach(st=>{if(!(st.drops.length||st.picks.length))return;no++;(at[st.loc]=at[st.loc]||[]).push(no)});
+for(const[id,ns]of Object.entries(at)){const p=locPos(id);if(!p)continue;const t=ns.join(','),r=(t.length>2?1.4+t.length*.55:2.2)*k;
+const cand=[[0,-3.8],[3.6,-3],[-3.6,-3],[0,4],[4,2.6],[-4,2.6],[5.5,0],[-5.5,0]];let pos=null;
+for(const[dx,dy]of cand){const cx=p[0]+dx*k,cy=p[1]+dy*k,bx=[cx-r,cy-r,cx+r,cy+r];if(!hit(bx)){boxes.push(bx);pos=[cx,cy];break}}
+if(!pos){pos=[p[0],p[1]-3.8*k]}
+top+=`<line x1="${p[0]}" y1="${p[1]}" x2="${pos[0].toFixed(2)}" y2="${pos[1].toFixed(2)}" stroke="var(--flare)" stroke-width="${.3*k}"/><circle class="nb" cx="${pos[0].toFixed(2)}" cy="${pos[1].toFixed(2)}" r="${r.toFixed(2)}" stroke-width="${.4*k}"/><text class="nt" x="${pos[0].toFixed(2)}" y="${(pos[1]+.9*k).toFixed(2)}" font-size="${fs*.95}" text-anchor="middle">${t}</text>`}}
+/* stanice: nejdřív ty na trase, pak ostatní */
+const short0=n=>n.replace(/ (Station|Service Station|Refueling|Fuel 'N Supplies)$/,'');
+const ordered=stations.slice().sort((x,y)=>(inRoute.has(y.id)?1:0)-(inRoute.has(x.id)?1:0));
+
+for(const l of ordered){const[x,y]=POS[l.a],on=l.id===S.set.pos,imp=inRoute.has(l.id);
+st+=`<g class="clk" data-act="setpos" data-id="${l.id}"><title>${esc(lbl(l))} – nastavit jako aktuální polohu</title><circle cx="${x}" cy="${y}" r="${3*k}" fill="transparent"/><rect class="st${on?' on':''}" x="${x-k}" y="${y-k}" width="${2*k}" height="${2*k}" transform="rotate(45 ${x} ${y})" stroke-width="${.3*k}"/></g>`;
+const sn=short0(l.n)+(l.e?' (E)':'');if(imp)lt+=txt(lab(x,y,sn,fs*.9,true,2.4*k),sn,fs*.9)}
+
+for(const l of ordered)if(!inRoute.has(l.id)){const[x,y]=POS[l.a],sn=short0(l.n)+(l.e?' (E)':'');lt+=txt(lab(x,y,sn,fs*.85,false,2.4*k),sn,fs*.85)}
+/* povrchové outposty na trase */
+for(const id of new Set(route)){const l=LM[id];if(!l||!l.s)continue;const p=locPos(id);lt+=`<circle cx="${p[0]}" cy="${p[1]}" r="${.8*k}" fill="var(--ink)"/>`+txt(lab(p[0],p[1],l.n,fs*.85,true,2*k),l.n,fs*.85)}
+s+=st+lt+top;
+if(me)s+=`<circle class="me pulse" cx="${me[0]}" cy="${me[1]}" r="${3.2*k}" stroke-width="${.6*k}"/><circle class="me" cx="${me[0]}" cy="${me[1]}" r="${2.4*k}" stroke-width="${.6*k}"/>`;
+s+='</svg>';
+const btn=(v,t)=>`<button class="sm${mapView===v?' on':''}" data-act="mapview" data-id="${v}">${t}</button>`;
+const ml=LM[S.set.pos];
+return`<div class="mapc">${s}<div class="seg">${btn('route','Trasa')}${btn('inner','Vnitřní planety')}${btn('all','Celý systém')}</div>
+<p class="small mute" style="margin:6px 0 0">Jsi u: <b style="color:var(--ink)">${esc(lbl(ml))}</b>${ml?.d?' · '+esc(ml.d):''}. Kroužek = poloha podle posledního zápisu, oranžová čára = zbývající trasa, čárkovaně = kudy jsi letěl. (E) = stanice s externím nákladním výtahem. Klepnutím na stanici změníš polohu. Polohy jsou dopočítané ze vzdáleností UEX, Nyx Gateway je umístěná odhadem.</p></div>`}
+
+let lastRoute=null;
+function vTrasa(){const R=solve();lastRoute=R;const w=warnings();
+const mins=m=>m>=60?`${Math.floor(m/60)} h ${Math.round(m%60)} min`:`${Math.round(m)} min`;
+const actionable=R.stops.filter(s=>s.drops.length||s.picks.length);
+let h=`<div class="card"><div class="row"><label>Kde teď jsem${locSelect('data-set="set.pos"',S.set.pos)}</label><label>Konec trasy${locSelect('data-set="set.end"',S.set.end,{empty:'kdekoli'})}</label></div></div>`;
+if(!R.jobs.length)return h+`<div class="tw">${mapSVG(null)}<div class="card"><h2>Žádný náklad k převozu</h2><p class="mute">Přidej kontrakt v záložce <a href="#kontrakty">Kontrakty</a>. Trasa se spočítá sama.</p></div></div>`;
+const save=R.naive-R.total;
+h+=`<div class="sum"><div><b>${actionable.length}</b>zastávek</div><div><b>${fmt(R.gmT)} Gm</b>vzdálenost</div><div><b>~${mins(R.total)}</b>odhad času</div>${save>1?`<div><b class="save">−${mins(save)}</b>proti jízdě kontrakt po kontraktu</div>`:''}</div>`;
+if(!R.exact)h+=`<div class="warn">Hodně položek: trasa je spočítaná heuristicky (beam search), nemusí být úplně nejkratší.</div>`;
+if(R.est)h+=`<div class="warn">Některá vzdálenost je jen odhad (chybí v datech UEX, např. Nyx Gateway – spočítáno z její polohy na mapě).</div>`;
+h+=w.map(x=>`<div class="warn">${x}</div>`).join('');
+h+=`<div class="tw" style="margin-top:14px">${mapSVG(R)}<div><ol class="stops">${R.stops.map((s,i)=>{const has=s.drops.length||s.picks.length,l=locMap()[s.loc];
+if(i===0&&!has)return`<li class="stop start"><div class="num">start</div><div><h3>${esc(lbl(l))}<small>${esc(l?.d||'')}</small></h3><p class="leg">Tady jsi teď.</p></div></li>`;
+const no=R.stops.slice(0,i+1).filter(x=>x.drops.length||x.picks.length).length;
+return`<li class="stop"><div class="num">${has?no:'⚑'}</div><div class="card" style="margin-bottom:10px">
+<p class="leg">${i?`${fmt(s.leg.gm)} Gm${s.leg.est?' (odhad)':''} · ~${Math.round(s.leg.min)} min · v cíli za ~${mins(s.g)}`:'Na místě, kde jsi teď'}</p>
+<h3>${esc(lbl(l))}<small>${esc(l?.d||'')}${l?.x?' · výtah max '+l.x+' SCU':''}${l?.e?' · externí výtah':''}</small></h3>
+${actLine(R.jobs,s.drops,'out')}${actLine(R.jobs,s.picks,'in')}${has?'':'<p class="mute">Konec trasy.</p>'}
+<div class="load"><span>Po zastávce na palubě <b>${s.on}</b> / ${R.cap} SCU</span><span class="meter"><i style="width:${Math.min(100,s.on/R.cap*100)}%"></i></span></div>
+${has?`<button class="${no===1?'pri':''}" data-act="stopdone" data-i="${i}">Hotovo, zapsat do záznamů</button>`:''}</div></li>`}).join('')}</ol>
+<p class="small mute">Trasa minimalizuje čas: vzdálenost ÷ rychlost QT + režie zastávky + příplatek za povrch (Nastavení). Náklad, který se nevejde, se veze na víc jízd. Vzdálenosti: UEX API, přibližné.</p></div></div>`;
+return h}
+
+function contractForm(){const d=ui.draft;
+return`<div class="card"><h2 style="font-size:22px;margin-bottom:10px">${d.id?'Upravit kontrakt K'+C(d.id).no:'Nový kontrakt'}</h2>
+<div class="row"><label>Zadavatel<select data-d="giver">${opts(GIVERS,d.giver)}</select></label><label>Typ<select data-d="type">${opts(TYPES,d.type)}</select></label>
+<label>Odměna aUEC<input type="number" data-d="reward" value="${esc(d.reward)}" style="width:130px"></label><label>Max box SCU<select data-d="maxBox">${opts(BOX.slice().reverse(),d.maxBox)}</select></label>
+<label>Limit min<input type="number" data-d="limit" value="${esc(d.limit||'')}" placeholder="—"></label><label>Server<input data-d="server" value="${esc(d.server)}" style="width:120px"></label></div>
+<label style="margin-top:8px">Poznámka<input data-d="note" value="${esc(d.note)}"></label>
+${d.lines.map((ln,i)=>`<div class="line"><div class="row"><label>Komodita<input list="comm" data-l="${i}.com" value="${esc(ln.com)}" style="width:170px"></label>
+<label>Odkud${locSelect(`data-l="${i}.from"`,ln.from)}</label><label>Kam${locSelect(`data-l="${i}.to"`,ln.to)}</label><label>SCU<input type="number" data-l="${i}.scu" value="${esc(ln.scu)}"></label></div>
+<div class="row" style="margin-top:8px"><label>Boxy (počet kusů dané velikosti)<span class="boxes">${BOX.map(s=>`<input type="number" min="0" aria-label="${s} SCU" placeholder="${s}" data-l="${i}.b${s}" value="${+(ln.boxes||{})[s]||''}">`).join('')}</span></label>
+<button class="sm" data-act="autobox" data-i="${i}">Rozpočítat boxy</button>${d.lines.length>1?`<button class="sm danger" data-act="delline" data-i="${i}">Odebrat řádek</button>`:''}</div></div>`).join('')}
+<datalist id="comm">${COMM.map(c=>`<option value="${c}">`).join('')}</datalist>
+<div class="row"><button data-act="addline">+ Další položka</button><span style="flex:1"></span><button data-act="cancelc">Zrušit</button><button class="pri" data-act="savec">Uložit kontrakt</button></div></div>`}
+
+function vKontrakty(){let h=ui.draft?contractForm():`<div class="row" style="margin-bottom:14px"><button class="pri" data-act="newc">+ Nový kontrakt</button></div>`;
+const list=S.contracts.slice().sort((a,b)=>(a.status==='open'?0:1)-(b.status==='open'?0:1)||b.no-a.no);
+if(!list.length)h+=`<p class="mute">Zatím žádné kontrakty.</p>`;
+h+=list.map(c=>{const os=S.orders.filter(o=>o.cid===c.id).map(ov),allDone=os.length&&os.every(o=>o.done),r=remain(c);
+return`<div class="card"><div class="chead"><h3>K${c.no} · ${esc(c.giver)}</h3><span class="pill ${c.status}">${STATUS[c.status]}</span></div>
+<p class="small mute" style="margin:0 0 8px">${esc(c.type)} · <b>${fmt(+c.reward||0)} aUEC</b> · max box ${c.maxBox} SCU${r!==null&&c.status==='open'?` · ${r<0?'limit vypršel':'zbývá '+r+' min'}`:''}${c.server?' · server '+esc(c.server):''}${c.note?' · '+esc(c.note):''}</p>
+<div class="scroll"><table class="stack"><thead><tr><th>Komodita</th><th>Odkud → kam</th><th class="n">SCU</th><th class="n">Naloženo</th><th class="n">Vyloženo</th><th>Boxy</th></tr></thead><tbody>
+${os.map(o=>`<tr><td><span class="bx" style="border-color:${colorFor(o.to)}">&nbsp;</span>${esc(o.com)}</td><td>${esc(lname(o.from))} → ${esc(lname(o.to))}</td><td class="n">${o.scu}</td><td class="n">${o.L}</td><td class="n">${o.U}${o.X?` <span class="mute">(ztráta ${o.X})</span>`:''}</td><td>${boxStr(o.boxes)}</td></tr>`).join('')}</tbody></table></div>
+${allDone&&c.status==='open'?`<p class="warn">Vše doručeno. Odevzdej kontrakt v mobiGlasu a označ ho jako Odevzdáno.</p>`:''}
+<div class="row" style="margin-top:10px"><button class="sm" data-act="editc" data-id="${c.id}">Upravit</button><label style="flex-direction:row;align-items:center;gap:6px">Stav <select data-status="${c.id}">${opts(Object.entries(STATUS),c.status)}</select></label>
+<button class="sm danger" data-act="delc" data-id="${c.id}">${ui.confirm===c.id?'Opravdu smazat?':'Smazat'}</button></div></div>`}).join('');
+return h}
+
+function vManifest(){const os=activeOrders().map(ov).filter(o=>o.onboard>0),cap=+S.ship.cap||1,on=os.reduce((a,o)=>a+o.onboard,0);
+let h=`<div class="sum"><div><b>${on} SCU</b>na palubě</div><div><b>${Math.max(0,cap-on)} SCU</b>volno</div><div><b>${new Set(os.map(o=>o.to)).size}</b>destinací</div></div>`;
+if(!os.length)return h+`<p class="mute">Nákladní prostor je prázdný.</p>`;
+const by={};os.forEach(o=>(by[o.to]=by[o.to]||[]).push(o));
+const tot={};
+h+=Object.entries(by).map(([to,list])=>`<div class="card dest" style="--c:${colorFor(to)}"><h3 style="font-size:20px">${esc(lname(to))} <span class="mute small">${list.reduce((a,o)=>a+o.onboard,0)} SCU</span></h3>
+${list.map(o=>{const full=o.onboard===o.scu;if(full)BOX.forEach(s=>tot[s]=(tot[s]||0)+(+(o.boxes||{})[s]||0));return`<div class="act" style="--c:${colorFor(to)}"><b>${o.onboard} SCU</b> ${esc(o.com)} <span class="mute small">K${C(o.cid).no} · z ${esc(lname(o.from))}</span> ${full?boxStr(o.boxes):'<span class="mute small">částečně naloženo</span>'}</div>`}).join('')}</div>`).join('');
+const t=BOX.filter(s=>tot[s]);if(t.length)h+=`<p class="small mute">Boxy u plně naložených položek: ${t.map(s=>`<span class="bx">${tot[s]}× ${s} SCU</span>`).join('')}</p>`;
+return h}
+
+function vZaznamy(){const f=ui.logForm,act=activeOrders();
+const paid=S.contracts.filter(c=>c.status==='paid'),del=S.log.filter(e=>e.act==='unload').reduce((a,e)=>a+ +e.scu,0),loss=S.log.filter(e=>e.act==='loss').reduce((a,e)=>a+ +e.scu,0);
+const byG={};paid.forEach(c=>byG[c.giver]=(byG[c.giver]||0)+(+c.reward||0));
+let h=`<div class="sum"><div><b>${fmt(paid.reduce((a,c)=>a+(+c.reward||0),0))}</b>aUEC vyplaceno</div><div><b>${paid.length}</b>odevzdaných kontraktů</div><div><b>${fmt(del)} SCU</b>vyloženo</div><div><b>${fmt(loss)} SCU</b>ztráty</div><div><b>${S.contracts.filter(c=>c.status==='nospawn').length}</b>nespawnulo</div></div>`;
+if(Object.keys(byG).length)h+=`<p class="small mute">Výdělek podle zadavatele: ${Object.entries(byG).map(([g,v])=>`${esc(g)} ${fmt(v)} aUEC`).join(' · ')}</p>`;
+h+=`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Ruční záznam</h3><div class="row">
+<label>Položka<select data-f="oid">${act.map(o=>`<option value="${o.id}"${f.oid===o.id?' selected':''}>K${C(o.cid).no} ${esc(o.com)} · ${esc(lname(o.from))} → ${esc(lname(o.to))}</option>`).join('')||'<option value="">žádná aktivní položka</option>'}</select></label>
+<label>Akce<select data-f="act">${opts([['load','Naloženo'],['unload','Vyloženo'],['loss','Ztráta / zničeno']],f.act||'load')}</select></label>
+<label>SCU<input type="number" min="1" data-f="scu" value="${esc(f.scu||'')}"></label><label>Místo${locSelect('data-f="loc"',f.loc||S.set.pos)}</label>
+<label>Poznámka<input data-f="note" value="${esc(f.note||'')}" style="width:160px"></label><button class="pri" data-act="addlog">Zapsat</button></div></div>`;
+const L=S.log.slice().sort((a,b)=>b.t-a.t);
+h+=L.length?`<div class="scroll"><table class="stack"><thead><tr><th>Čas</th><th>Akce</th><th class="n">SCU</th><th>Položka</th><th>Místo</th><th></th></tr></thead><tbody>${L.map(e=>{const o=O(e.oid),c=o&&C(o.cid),d=new Date(e.t);
+return`<tr><td>${d.getDate()}.${d.getMonth()+1}. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</td><td>${{load:'Naloženo',unload:'Vyloženo',loss:'Ztráta'}[e.act]}</td><td class="n">${e.scu}</td><td>${o?`K${c?.no??'?'} ${esc(o.com)}`:'<span class="mute">smazaná položka</span>'}${e.note?` <span class="mute small">${esc(e.note)}</span>`:''}</td><td>${esc(lname(e.loc))}</td><td><button class="sm danger" data-act="dellog" data-id="${e.id}" aria-label="Smazat záznam">×</button></td></tr>`}).join('')}</tbody></table></div>`:`<p class="mute">Žádné záznamy.</p>`;
+return h}
+
+function vNastaveni(){const nodeOpts=Object.entries(NODES);
+return`<div class="grid2"><div class="card"><h3 style="font-size:18px;margin-bottom:8px">Loď</h3><div class="row">
+<label>Název<input data-set="ship.name" value="${esc(S.ship.name)}"></label><label>Kapacita SCU<input type="number" data-set="ship.cap" value="${S.ship.cap}"></label>
+<label>Max box v gridu<select data-set="ship.maxBox">${opts(BOX.slice().reverse(),S.ship.maxBox)}</select></label></div></div>
+<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Výpočet trasy</h3><div class="row">
+<label>Rychlost QT (Gm/min)<input type="number" step="0.5" data-set="set.speed" value="${S.set.speed}"></label><label>Režie zastávky (min)<input type="number" data-set="set.stop" value="${S.set.stop}"></label><label>Příplatek povrch (min)<input type="number" data-set="set.surf" value="${S.set.surf}"></label></div>
+<p class="small mute">Režie = zarovnání, spool, přistání a obsluha výtahu. Příplatek povrch = let atmosférou k outpostu.</p></div>
+<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Vlastní lokace</h3><div class="row">
+<label>Název<input data-f="cl_n" value="${esc(ui.logForm.cl_n||'')}"></label><label>Nejbližší uzel<select data-f="cl_a">${opts(nodeOpts,ui.logForm.cl_a||'BL')}</select></label>
+<label>Max box<select data-f="cl_x">${opts([[0,'neznámý'],...BOX.slice().reverse().map(b=>[b,b])],ui.logForm.cl_x||0)}</select></label>
+<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-f="cl_s" ${ui.logForm.cl_s?'checked':''} style="min-height:auto"> na povrchu</label><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-f="cl_e" ${ui.logForm.cl_e?'checked':''} style="min-height:auto"> externí výtah</label><button data-act="addloc">Přidat</button></div>
+${(S.customLocs||[]).map(l=>`<p style="margin:8px 0 0">${esc(lbl(l))} <span class="mute small">u ${NODES[l.a]}${l.s?' · povrch':''}</span> <button class="sm danger" data-act="delloc" data-id="${l.id}">Smazat</button></p>`).join('')}</div>
+<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Záloha dat</h3>
+<div class="row" style="margin-bottom:10px"><button data-act="dl">${TAURI?'Uložit zálohu do Dokumentů':'Stáhnout zálohu (.json)'}</button><label class="small" style="flex-direction:row;align-items:center;gap:6px">Načíst ze souboru <input type="file" id="impf" accept=".json,application/json" style="min-height:auto;padding:4px"></label></div><textarea readonly id="exp">${esc(JSON.stringify(S))}</textarea><div class="row" style="margin:8px 0 14px"><button data-act="copy">Kopírovat zálohu</button><span class="small mute" id="copied"></span></div>
+<textarea id="imp" placeholder="Sem vlož zálohu (JSON)"></textarea><div class="row" style="margin-top:8px"><button data-act="import">Nahradit data zálohou</button>
+<button class="danger" data-act="reset">${ui.confirm==='reset'?'Opravdu vše smazat?':'Smazat všechna data'}</button></div></div></div>
+<p class="small mute">${TAURI?`Data se průběžně ukládají do souboru <code>${esc(dataPath)}</code>. Záloha se uloží do složky Dokumenty.`:'Data se ukládají jen v tomto prohlížeči na tomto zařízení. Pro přenos jinam nebo zálohu použij Stáhnout zálohu / Načíst ze souboru.'} Lokace, maximální boxy výtahů a vzdálenosti v Gm pocházejí z <a href="https://uexcorp.space" target="_blank" rel="noopener">UEX</a> (stav listopad 2026). Označení (E) = stanice s externím nákladním výtahem (podle UEX, pole loading dock). UEX uvádí Pyro IV a Pyro V na téže pozici, proto mají v trase nulovou vzdálenost.</p>`}
+
+function render(){header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni}[t];
+document.getElementById('app').innerHTML=(S.sample?`<div class="banner">Ukázková data, aby bylo vidět, jak nástroj funguje.<button data-act="clearsample">Smazat a začít načisto</button></div>`:'')+V()}
+
+/* ukládání: localStorage + db artefaktu */
+let db=null,saving=false,pend=false,timer=null,lastJson='',syncCls='',syncTxt='načítám…';
+const setSync=(c,t)=>{syncCls=c;syncTxt=t;const el=document.getElementById('sync');if(el){el.className='sync '+c;el.textContent=t}};
+const TAURI=window.__TAURI__&&window.__TAURI__.core;const inv=(c,a)=>TAURI.invoke(c,a);
+let ftimer=null;const fileSave=()=>{if(!TAURI)return;clearTimeout(ftimer);setSync('','ukládám…');ftimer=setTimeout(()=>{inv('save_state',{json:JSON.stringify(S)}).then(()=>setSync('ok','uloženo')).catch(()=>setSync('err','neuloženo'))},400)};
+function save(){const j=JSON.stringify(S);try{localStorage.setItem(LS,j)}catch(e){}fileSave();if(db){clearTimeout(timer);timer=setTimeout(()=>{timer=null;flush()},700);setSync('','ukládám…')}}
+async function flush(){if(!db)return;if(saving){pend=true;return}saving=true;const j=JSON.stringify(S);
+try{await db.doc('hauling/state').set({json:j,upd:Date.now()});lastJson=j;setSync('ok','uloženo')}catch(e){setSync('err','neuloženo')}
+saving=false;if(pend){pend=false;flush()}}
+async function initDb(){try{db=await window.claude.use('db')}catch(e){db=null}if(!db){setSync('','jen v prohlížeči');return}
+let got=false;const to=setTimeout(()=>{if(!got)setSync('err','úložiště nedostupné')},10000);
+db.doc('hauling/state').onSnapshot(snap=>{if(snap.metadata.hasPendingWrites)return;if(!snap.metadata.fromCache){got=true;clearTimeout(to)}
+if(snap.exists){const j=snap.data().json;if(typeof j==='string'&&j!==lastJson&&!timer&&!saving){lastJson=j;if(j!==JSON.stringify(S)){try{const n=JSON.parse(j);if(n&&n.v){S=n;try{localStorage.setItem(LS,j)}catch(e){}render()}}catch(e){}}}setSync('ok','uloženo')}
+else if(!snap.metadata.fromCache)flush()},()=>{clearTimeout(to);setSync('err','úložiště nedostupné')})}
+/* desktop: data v souboru, okno navrchu */
+let dataPath='',onTop=false;try{onTop=localStorage.getItem('hp-ontop')==='1'}catch(e){}
+if(TAURI){inv('load_state').then(j=>{if(j){try{const n=JSON.parse(j);if(n&&n.v){S=n;render()}}catch(e){}}else{inv('save_state',{json:JSON.stringify(S)})}setSync('ok','uloženo')}).catch(()=>setSync('err','soubor nedostupný'));
+inv('data_path').then(p=>{dataPath=p;if(tab()==='nastaveni')render()});if(onTop)inv('set_always_on_top',{on:true}).catch(()=>{})}
+
+const setPath=(path,val)=>{const[a,b]=path.split('.');S[a][b]=val};
+const num=v=>v===''?0:+v;
+
+document.addEventListener('input',e=>{const t=e.target;
+if(t.dataset.d!==undefined&&ui.draft){ui.draft[t.dataset.d]=t.value}
+if(t.dataset.l!==undefined&&ui.draft){const[i,k]=t.dataset.l.split('.'),ln=ui.draft.lines[+i];if(k[0]==='b'&&/^b\d+$/.test(k)){ln.boxes=ln.boxes||{};ln.boxes[k.slice(1)]=num(t.value)}else ln[k]=t.value}
+if(t.dataset.f!==undefined)ui.logForm[t.dataset.f]=t.type==='checkbox'?t.checked:t.value});
+document.addEventListener('change',e=>{const t=e.target;
+if(t.dataset.f!==undefined)ui.logForm[t.dataset.f]=t.type==='checkbox'?t.checked:t.value;
+if(t.dataset.set){const n=['ship.cap','ship.maxBox','set.speed','set.stop','set.surf'].includes(t.dataset.set);setPath(t.dataset.set,n?num(t.value):t.value);save();render()}
+if(t.dataset.status){const c=C(t.dataset.status);c.status=t.value;save();render()}});
+
+function logAdd(oid,act,scu,loc,note){S.log.push({id:uid(),t:Date.now(),oid,act,scu:+scu,loc,note:note||''})}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,id=b.dataset.id,i=+b.dataset.i;
+if(a!=='delc'&&a!=='reset')ui.confirm=null;
+if(a==='newc'){ui.draft={giver:GIVERS[0],type:'Planetary',reward:'',maxBox:S.ship.maxBox||8,limit:'',server:'',note:'',lines:[{com:'',from:S.set.pos,to:'patch',scu:'',boxes:{}}]}}
+else if(a==='editc'){const c=C(id);ui.draft={...c,lines:S.orders.filter(o=>o.cid===id).map(o=>({...o,boxes:{...o.boxes}}))};scrollTo(0,0)}
+else if(a==='addline'){const p=ui.draft.lines[ui.draft.lines.length-1];ui.draft.lines.push({com:'',from:p?.from||S.set.pos,to:p?.to||'patch',scu:'',boxes:{}})}
+else if(a==='delline'){ui.draft.lines.splice(i,1)}
+else if(a==='autobox'){const ln=ui.draft.lines[i];ln.boxes=autoBoxes(ln.scu,+ui.draft.maxBox||32)}
+else if(a==='cancelc'){ui.draft=null}
+else if(a==='savec'){const d=ui.draft;const lines=d.lines.filter(l=>+l.scu>0&&l.from&&l.to);if(!lines.length){b.textContent='Doplň aspoň jednu položku s SCU';return}
+let c=d.id?C(d.id):null;if(!c){c={id:uid(),no:++S.seq,acc:Date.now(),status:'open'};S.contracts.push(c)}
+Object.assign(c,{giver:d.giver,type:d.type,reward:num(d.reward),maxBox:num(d.maxBox),limit:num(d.limit),server:d.server||'',note:d.note||''});
+const keep=new Set();for(const l of lines){const body={cid:c.id,com:l.com||'Náklad',from:l.from,to:l.to,scu:+l.scu,boxes:Object.fromEntries(Object.entries(l.boxes||{}).filter(([,v])=>+v>0).map(([k,v])=>[k,+v]))};
+const ex=l.id&&O(l.id);if(ex){Object.assign(ex,body);keep.add(ex.id)}else{const o={id:uid(),...body};S.orders.push(o);keep.add(o.id)}}
+S.orders=S.orders.filter(o=>o.cid!==c.id||keep.has(o.id));ui.draft=null;save()}
+else if(a==='delc'){if(ui.confirm!==id){ui.confirm=id}else{S.orders.filter(o=>o.cid===id).forEach(o=>S.log=S.log.filter(e=>e.oid!==o.id));S.orders=S.orders.filter(o=>o.cid!==id);S.contracts=S.contracts.filter(c=>c.id!==id);ui.confirm=null;save()}}
+else if(a==='stopdone'&&lastRoute){const s=lastRoute.stops[i];const sumBy=(idx)=>{const r={};idx.forEach(k=>{const j=lastRoute.jobs[k];r[j.oid]=(r[j.oid]||0)+j.scu});return r};
+Object.entries(sumBy(s.drops)).forEach(([oid,q])=>logAdd(oid,'unload',q,s.loc));Object.entries(sumBy(s.picks)).forEach(([oid,q])=>logAdd(oid,'load',q,s.loc));
+S.set.pos=s.loc;save()}
+else if(a==='addlog'){const f=ui.logForm,oid=f.oid||activeOrders()[0]?.id;if(!oid||!(+f.scu>0)){b.textContent='Vyber položku a SCU';return}
+logAdd(oid,f.act||'load',f.scu,f.loc||S.set.pos,f.note);S.set.pos=f.loc||S.set.pos;ui.logForm={oid};save()}
+else if(a==='ontop'&&TAURI){onTop=!onTop;try{localStorage.setItem('hp-ontop',onTop?'1':'0')}catch(e){}inv('set_always_on_top',{on:onTop}).catch(()=>{})}
+else if(a==='mapview'){mapView=id}
+else if(a==='setpos'){S.set.pos=id;save()}
+else if(a==='dellog'){S.log=S.log.filter(x=>x.id!==id);save()}
+else if(a==='addloc'){const f=ui.logForm;if(!f.cl_n){b.textContent='Zadej název';return}S.customLocs=S.customLocs||[];S.customLocs.push({id:'u'+uid(),n:f.cl_n,d:NODES[f.cl_a||'BL'],a:f.cl_a||'BL',x:+f.cl_x||0,s:!!f.cl_s,e:!!f.cl_e});ui.logForm={};save()}
+else if(a==='delloc'){S.customLocs=S.customLocs.filter(l=>l.id!==id);save()}
+else if(a==='copy'){navigator.clipboard?.writeText(JSON.stringify(S)).then(()=>{document.getElementById('copied').textContent='Zkopírováno'},()=>{document.getElementById('exp').select();document.getElementById('copied').textContent='Označeno, zkopíruj Ctrl+C'});return}
+else if(a==='dl'&&TAURI){inv('export_backup',{json:JSON.stringify(S,null,1)}).then(p=>alertBox('Záloha uložena: '+p)).catch(e=>alertBox('Zálohu se nepodařilo uložit: '+e));return}
+else if(a==='dl'){const bl=new Blob([JSON.stringify(S,null,1)],{type:'application/json'}),u=URL.createObjectURL(bl),el=document.createElement('a'),d=new Date();el.href=u;el.download=`hauling-pyro-zaloha-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.json`;document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return}
+else if(a==='import'){try{const n=JSON.parse(document.getElementById('imp').value);if(!n||!n.v||!Array.isArray(n.contracts))throw 0;S=n;save()}catch(err){b.textContent='Neplatná záloha';return}}
+else if(a==='reset'){if(ui.confirm!=='reset'){ui.confirm='reset'}else{S=empty();ui.confirm=null;save()}}
+else if(a==='clearsample'){const ship=S.sample?empty().ship:S.ship;S=empty();S.ship=ship;save()}
+render()});
+document.addEventListener('change',e=>{if(e.target.id!=='impf'||!e.target.files[0])return;e.target.files[0].text().then(t=>{try{const n=JSON.parse(t);if(!n||!n.v||!Array.isArray(n.contracts))throw 0;S=n;save();render()}catch(err){e.target.value='';alertBox('Soubor není platná záloha Hauling Pyro.')}})});
+const alertBox=m=>{const b=document.createElement('div');b.className='banner';b.textContent=m;document.getElementById('app').prepend(b);setTimeout(()=>b.remove(),5000)};
+addEventListener('hashchange',()=>{ui.confirm=null;render();scrollTo(0,0)});
+render();
+}
+</script>
+</body></html>
