@@ -9,7 +9,8 @@ Neoficiální fanouškovský nástroj, bez vazby na Cloud Imperium Games ani Rob
 - **Navrchu**: tlačítko v horní liště drží okno nad ostatními, i nad hrou v režimu *Borderless*.
 - Data se průběžně ukládají do souboru `%APPDATA%\cz.haulingpyro.app\hauling-pyro.json`.
 - Záloha jedním tlačítkem do složky Dokumenty, obnova z libovolného souboru zálohy.
-- **Načíst sledovaný kontrakt** (záložka Kontrakty): přečte Game.log a předvyplní formulář – zadavatele, typ, odhad max. boxu, položky (komodita, SCU, odkud, kam) a rozpis boxů. Odměnu a časový limit hra do logu nezapisuje, ty se doplňují ručně. Kontrakt musí být při přijetí **sledovaný (tracked)**, jinak hra zapíše jen první položku. Cesta ke Game.log se nastavuje v Nastavení (výchozí `C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Game.log`), aplikace soubor jen čte.
+- **Načíst kontrakt z Game.log** (záložka Kontrakty): předvyplní zadavatele, typ, max. box a všechna místa nakládky i vykládky (i kontrakty typu *Multi→Single* a *Single→Multi*). Místa se poznají podle polohy značek; aplikace má výchozí katalog míst v Pyru a učí se další – z kontraktů, kde je log jmenuje, a z míst, která ručně opravíš. Množství SCU zapisuje hra jen u kontraktu, který byl při přijetí **sledovaný (tracked)**; u více nakládek uvádí jen celkový součet (aplikace ho rozdělí rovnoměrně k úpravě). Odměnu a časový limit hra do logu nezapisuje.
+- **Vzhled**: světlý, tmavý nebo podle nastavení Windows (Nastavení → Vzhled).
 
 ## Sestavení přes GitHub (bez instalace čehokoli na PC)
 1. Na github.com založ nový repozitář (třeba `hauling-pyro`).

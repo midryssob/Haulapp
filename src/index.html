@@ -86,6 +86,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 @media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6.5em;margin-inline-start:-7em;color:var(--mute);font-size:12px}.stack td:empty{display:none}.stop{grid-template-columns:40px minmax(0,1fr)}.num{width:40px;height:40px;font-size:18px}.stop::before{left:18px;top:40px}}
 @media(prefers-reduced-motion:no-preference){.load .meter i,.top .meter i{transition:width .4s}}
 </style>
+<script>try{const t=localStorage.getItem('hp-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head><body>
 <header class="top"><div class="toprow">
@@ -142,6 +143,8 @@ function empty(){return{v:1,seq:0,ship:{name:'Moje loď',cap:96,maxBox:16},set:{
 let S;try{S=JSON.parse(localStorage.getItem(LS))}catch(e){}
 if(!S||!S.v)S=sample();
 const ui={draft:null,confirm:null,logForm:{}};
+let themeOwned=false;try{themeOwned=['light','dark'].includes(localStorage.getItem('hp-theme'))}catch(e){}
+function applyTheme(){const t=(S.set&&S.set.theme)||'system',r=document.documentElement;if(t==='light'||t==='dark'){r.dataset.theme=t;themeOwned=true}else if(themeOwned){delete r.dataset.theme;themeOwned=false}try{localStorage.setItem('hp-theme',t)}catch(e){}}
 
 const locs=()=>BUILTIN.concat((S.customLocs||[]).map(l=>({...l,g:'Vlastní'})));
 const locMap=()=>Object.fromEntries(locs().map(l=>[l.id,l]));
@@ -320,16 +323,26 @@ if(window.__TAURI__){try{window.__TAURI__.app.getVersion().then(v=>{appVer=v;if(
 const GLOG_DEFAULT='C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log';
 const TA=()=>window.__TAURI__&&window.__TAURI__.core;
 const stripT=s=>String(s||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
-function parseLog(txt){const M={};const get=id=>M[id]||(M[id]={id,obj:{},oo:[]});
+/* polohy značek (km, souřadnice zóny) → lokace; výchozí katalog z reálných logů, aplikace se učí další */
+const POS_SEED={"-315,302,-100": "ruin", "-21101,-9275,-9519": "rods", "-9821,7015,18514": "rats", "23515,-15604,12706": "megu", "-11024,-25541,2571": "check", "374,-263,-270": "sunset", "171,-373,-58": "bueno", "380,-719,226": "orbit", "-285,-13,-8": "lastl", "-196,-319,171": "rust", "-245,-86,189": "chawla", "84,337,-120": "seer", "-19,-38,7": "sgw", "-19126,10433,17665": "gas", "383,-246,-272": "jack", "2281,-14897,2753": "patch", "-384,153,6": "gold", "10905,4251,1358": "starl", "-25441,-23933,-10765": "dud"};
+const posKey=p=>p.map(v=>Math.round(v)).join(',');
+function posCat(){return Object.assign({},POS_SEED,S.posCat||{})}
+function locAt(p){if(!p)return null;const cat=posCat();const k=posKey(p);if(cat[k])return cat[k];
+for(const[kk,id]of Object.entries(cat)){const q=kk.split(',').map(Number);if(Math.abs(q[0]-p[0])<=3&&Math.abs(q[1]-p[1])<=3&&Math.abs(q[2]-p[2])<=3)return id}return null}
+function parseLog(txt){const M={};const get=id=>M[id]||(M[id]={id,obj:{},oo:[],pos:{}});
 for(const line of txt.split(/\r?\n/)){let m;
 if(line.includes('<SHUDEvent_OnNotification>')){m=line.match(/Added notification "([^:"]+):\s*(.*?)\s*" \[\d+\].*?MissionId: \[([^\]]*)\], ObjectiveId: \[([^\]]*)\]/);if(!m||!m[3])continue;
 const kind=m[1].trim(),text=stripT(m[2]).replace(/:\s*$/,'').trim(),c=get(m[3]),ts=(line.match(/^<([^>]+)>/)||[])[1];
 if(kind==='Contract Accepted'){c.title=text;c.t=Date.parse(ts)||0;c.obj={};c.oo=[];c.ended=''}
 else if(kind==='New Objective'&&m[4]){if(!(m[4] in c.obj))c.oo.push(m[4]);c.obj[m[4]]=text}
 else if(/^Contract (Complete|Failed|Abandoned|Withdrawn|Expired)/.test(kind))c.ended=kind}
-else if(line.includes('<CLocalMissionPhaseMarker::CreateMarker>')){m=line.match(/missionId \[([^\]]+)\], generator name \[([^\]]*)\], contract \[([^\]]*)\]/);if(m){const c=get(m[1]);c.gen=m[2];c.code=m[3]}}
+else if(line.includes('CreateMarker>')||line.includes('AddToPlayerDataBank>')){
+m=line.match(/missionId ?\[([^\]]+)\].*?objectiveId ?\[([^\]]+)\]/);const p=line.match(/(?:position \[|ZonePos: )x: (-?[\d.]+), y: (-?[\d.]+), z: (-?[\d.]+)/);
+if(m){const c=get(m[1]);if(line.includes('CreateMarker>')){const g=line.match(/generator name \[([^\]]*)\], contract \[([^\]]*)\]/);if(g){c.gen=g[1];c.code=g[2]}}
+if(p)c.pos[m[2]]=[+p[1]/1000,+p[2]/1000,+p[3]/1000]}}
 else if(line.includes('<EndMission>')){m=line.match(/MissionId\[([^\]]+)\].*?CompletionType\[(\w+)\]/);if(m&&M[m[1]])M[m[1]].ended=m[2]}}
-return Object.values(M).filter(c=>c.title).sort((a,b)=>(b.t||0)-(a.t||0))}
+const isHaul=c=>(c.code&&/haul/i.test(c.code))||Object.keys(c.pos).concat(Object.keys(c.obj)).some(k=>/^(pickup|dropoff)_/.test(k));
+return Object.values(M).filter(c=>c.title&&isHaul(c)).sort((a,b)=>(b.t||0)-(a.t||0))}
 function parseObj(t){let m;
 if(m=t.match(/^Deliver (\d+)\/(\d+)(?: SCU)?(?: of)? (.+?) to (.+)$/i))return{item:m[3],scu:+m[2],dest:m[4]};
 if(m=t.match(/^(\d+)\/(\d+)(?: SCU)?(?: of)? (.+?) > (.+)$/))return{item:m[3],scu:+m[2],dest:m[4]};
@@ -339,34 +352,58 @@ return null}
 const normN=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 function matchLoc(name){if(/\bsystem\s*$/i.test(String(name||'').trim()))return null;const n=normN(String(name||'').replace(/\s+Station$/i,''));if(n.length<3)return null;let best=null,bl=0;
 for(const l of locs()){const ln=normN(l.n.replace(/ (Station|Service Station)$/,''));if(ln.length<3)continue;if(n===ln||n.includes(ln)||ln.includes(n)){if(ln.length>bl){best=l;bl=ln.length}}}return best}
-function titleRoute(title){const t=String(title||'').replace(/\s*\[[^\]]*\]/g,'').trim(),last=t.split(/\s+[-|]\s+/).pop(),m=last.match(/^(?:from\s+)?(.+?)\s*(?:>|→|->)\s*(.+)$/i);return m?{orig:m[1].trim(),dest:m[2].trim()}:null}
-function draftFromLog(c){const hints=[],code=(c.code||'')+' '+(c.gen||'')+' '+c.title,lc=code.toLowerCase();
-const giver=/covalex/.test(lc)?'Covalex Shipping':/ling ?family|lingfamily/.test(lc)?'Ling Family Hauling':/red ?wind/.test(lc)?'Red Wind Linehaul':/citizens ?for ?prosperity|citizensforprosperity|\bcfp/.test(lc)?'Citizens for Prosperity':/headhunter/.test(lc)?'Headhunters':'Jiný';
+function titleRoute(title){const t=String(title||'').replace(/\s*\[[^\]]*\]/g,'').trim(),last=t.split(/\s+[-|]\s+/).pop().trim();let m;
+if(m=last.match(/^(?:from\s+)?(.+?)\s*(?:>|→|->)\s*(.+)$/i))return{orig:m[1].trim(),dest:m[2].trim()};
+if(m=last.match(/^from\s+(.+)$/i))return{orig:m[1].trim(),dest:null};
+if(m=last.match(/^to\s+(.+)$/i))return{orig:null,dest:m[1].trim()};return null}
+const objIdx=k=>+(k.match(/_(\d+)$/)||[0,0])[1];
+/* naučí katalog polohy z kontraktů, kde log místa jmenuje */
+function learnFromLog(all){let n=0;S.posCat=S.posCat||{};const cat=posCat();
+const put=(p,id)=>{if(!p||!id)return;const k=posKey(p);if(!cat[k]&&!locAt(p)){S.posCat[k]=id;cat[k]=id;n++}};
+for(const c of all){const tr=titleRoute(c.title),o=tr&&tr.orig?matchLoc(tr.orig):null,d=tr&&tr.dest?matchLoc(tr.dest):null;
+for(const[k,p]of Object.entries(c.pos)){if(/^dropoff_/.test(k)){const ob=c.obj[k]?parseObj(c.obj[k]):null,l=ob&&ob.dest?matchLoc(ob.dest):null;put(p,l?l.id:(!c.obj[k]&&d?d.id:null))}
+else if(/^pickup_/.test(k)&&o)put(p,o.id)}}
+return n}
+const camel=s=>s.replace(/([a-z])([A-Z])/g,'$1 $2');
+function draftFromLog(c){const hints=[],code=(c.code||'')+' '+(c.gen||'')+' '+c.title,lc=code.toLowerCase(),LM=locMap();
+const giver=/covalex/.test(lc)?'Covalex Shipping':/ling ?family|lingfamily/.test(lc)?'Ling Family Hauling':/red ?wind/.test(lc)?'Red Wind Linehaul':/citizens ?for ?prosperity|citizensforprosperity/.test(lc)?'Citizens for Prosperity':/headhunter/.test(lc)?'Headhunters':'Jiný';
 if(giver==='Jiný')hints.push(`Zadavatele se nepodařilo určit (v logu: ${esc(c.gen||'?')}).`);
 const type=/interstellar/.test(lc)?'Interstellar':/solar|stellar/.test(lc)?'Solar':/planetary/.test(lc)?'Planetary':/direct|local/.test(lc)?'Direct':'Planetary';
-const mb=/extra ?small|xsmall|_xs\b/.test(lc)?1:/small/.test(lc)?4:/medium/.test(lc)?8:/large/.test(lc)?32:+S.ship.maxBox||8;
-hints.push(`Max box ${mb} SCU je odhad podle velikosti kontraktu – ověř v mobiGlasu (u Medium bývá od úrovně Experienced 16).`);
+const hiRank=/\b(experienced|senior|master)\b/i.test(c.title);
+const mb=/extra ?small|xsmall|_xs\b/.test(lc)?1:/small/.test(lc)?4:/medium/.test(lc)?(hiRank?16:8):/large/.test(lc)?32:+S.ship.maxBox||8;
+hints.push(`Max box ${mb} SCU je odhad podle velikosti kontraktu a úrovně – ověř v mobiGlasu.`);
 hints.push('Odměnu a časový limit hra do logu nezapisuje – doplň je ručně.');
-const tr=titleRoute(c.title),objs=c.oo.map(k=>parseObj(c.obj[k])).filter(Boolean),picks=objs.filter(o=>o.pick),dels=objs.filter(o=>!o.pick);
-const unk=new Set();const res=(name,fallback)=>{const l=matchLoc(name);if(l)return l.id;if(name)unk.add(name);return fallback};
-const tOrig=tr?matchLoc(tr.orig):null,tDest=tr?matchLoc(tr.dest):null;
-const lines=dels.map(o=>{const pk=picks.find(p=>p.item&&normN(p.item)===normN(o.item))||(picks.length===1?picks[0]:null);
-let from=o.orig?res(o.orig,null):pk?res(pk.orig,null):tOrig?tOrig.id:null;let to=res(o.dest,null);
-if(!to&&tDest)to=tDest.id;if(!from){from=S.set.pos;hints.push(`U položky ${esc(o.item)} chybí místo vyzvednutí – předvyplněna aktuální poloha.`)}
-if(!to){to='';hints.push(`U položky ${esc(o.item)} se nepodařilo určit cíl – vyber ho ručně.`)}
-return{com:o.item,from,to:to||S.set.pos,scu:o.scu,boxes:autoBoxes(o.scu,mb)}});
-if(tr&&!tOrig)unk.add(tr.orig);if(tr&&!tDest&&!dels.some(o=>matchLoc(o.dest)))unk.add(tr.dest);
-if(unk.size)hints.push(`Názvy z logu, které nejsou v seznamu lokací: ${[...unk].map(x=>'„'+esc(x)+'“').join(', ')}. Vyber ručně nebo je přidej jako vlastní lokaci v Nastavení.`);
-if(!dels.length)hints.push('V logu nejsou položky nákladu – kontrakt asi nebyl při přijetí sledovaný (tracked). Doplň položky ručně.');
-else hints.push(`Načteno ${dels.length} ${dels.length===1?'položka':dels.length<=4?'položky':'položek'}. Pokud kontrakt nebyl při přijetí sledovaný, log může obsahovat jen první – zkontroluj počet.`);
-hints.push('Rozpis boxů je dopočítaný – uprav podle skutečnosti.');
+const tr=titleRoute(c.title),tOrig=tr&&tr.orig?matchLoc(tr.orig):null,tDest=tr&&tr.dest?matchLoc(tr.dest):null;
+const cm=(c.code||'').match(/_([A-Za-z]+)_CargoHauling/),codeItem=cm?camel(cm[1]):'';
+const pk0=Object.keys(c.pos).filter(k=>/^pickup_/.test(k)).sort((a,b)=>objIdx(a)-objIdx(b)),seenP=new Set(),pk=pk0.filter(k=>{const s=posKey(c.pos[k]);if(seenP.has(s))return false;seenP.add(s);return true});
+const dk=[...new Set(Object.keys(c.pos).concat(Object.keys(c.obj)).filter(k=>/^dropoff_/.test(k)))].sort((a,b)=>objIdx(a)-objIdx(b));
+const objs=Object.fromEntries(Object.entries(c.obj).map(([k,t])=>[k,parseObj(t)]));
+const unknown=[];
+const pLoc=pk.map((k,i)=>{const id=locAt(c.pos[k])||(tOrig&&(pk.length===1||!tDest)?tOrig.id:null);if(!id)unknown.push(`nakládka ${i+1}`);return{key:c.pos[k]?posKey(c.pos[k]):'',id}});
+const dLoc=dk.map((k,i)=>{const ob=objs[k];const byName=ob&&ob.dest?matchLoc(ob.dest):null;const id=(byName&&byName.id)||locAt(c.pos[k])||(tDest&&(dk.length===1||!tOrig)?tDest.id:null);if(!id)unknown.push(`vykládka ${i+1}`+(ob&&ob.dest?` („${esc(ob.dest)}“)`:''));return{key:c.pos[k]?posKey(c.pos[k]):'',id,ob}});
+const tracked=dk.some(k=>objs[k]);
+let lines=[];
+if(!pk.length&&!dk.length){/* starý formát bez značek */
+const dels=Object.values(objs).filter(o=>o&&!o.pick);lines=dels.map(o=>({com:o.item,from:(tOrig&&tOrig.id)||S.set.pos,to:(matchLoc(o.dest)||tDest||{id:''}).id,scu:o.scu}))}
+else if(pk.length>1&&dLoc.length<=1){const d=dLoc[0]||{id:tDest&&tDest.id,key:''},ob=d.ob,tot=ob?ob.scu:0,n=pk.length;
+lines=pLoc.map((p,i)=>({com:(ob&&ob.item)||codeItem,from:p.id,to:d.id,scu:tot?Math.floor(tot/n)+(i<tot%n?1:0):'',pk:p.key,dk:d.key}));
+if(tot)hints.push(`Kontrakt má ${n} místa nakládky a log uvádí jen celkové množství ${tot} SCU – rozděleno rovnoměrně. Uprav podle mobiGlasu, součet musí zůstat ${tot} SCU.`)}
+else{const p=pLoc[0]||{id:tOrig&&tOrig.id,key:''};
+lines=dLoc.map(d=>({com:(d.ob&&d.ob.item)||codeItem,from:p.id,to:d.id,scu:d.ob?d.ob.scu:'',pk:p.key,dk:d.key}));
+if(pLoc.length>1)hints.push(`Kontrakt má ${pLoc.length} místa nakládky i víc vykládek – zkontroluj, odkud se která položka veze.`)}
+for(const l of lines){if(!l.from){l.from=S.set.pos;l.fromUnknown=true}if(!l.to){l.to=S.set.pos;l.toUnknown=true}l.boxes=l.scu?autoBoxes(l.scu,mb):{}}
+if(unknown.length)hints.push(`Nepodařilo se určit: ${unknown.join(', ')} – vyber ručně. Po uložení si aplikace místo zapamatuje pro příští kontrakty.`);
+if(!tracked&&lines.length)hints.push('Kontrakt nebyl při přijetí sledovaný (tracked) – log neobsahuje množství. Doplň SCU u všech položek.');
+if(!lines.length)hints.push('V logu nejsou položky nákladu – doplň je ručně.');
+else hints.push(`Načteno ${lines.length} ${lines.length===1?'položka':lines.length<=4?'položky':'položek'} (${pk.length||1}× nakládka, ${dk.length||1}× vykládka).`);
+if(lines.some(l=>l.scu))hints.push('Rozpis boxů je dopočítaný – uprav podle skutečnosti.');
 return{giver,type,reward:'',maxBox:mb,limit:'',server:'',note:c.title,mid:c.id,lines:lines.length?lines:[{com:'',from:S.set.pos,to:'patch',scu:'',boxes:{}}],hints}}
-function handleLog(txt){const all=parseLog(txt),done=new Set(S.contracts.map(c=>c.mid).filter(Boolean));
-const cand=all.filter(c=>!c.ended&&!done.has(c.id));ui.logMsg='';ui.logCands=null;
-if(!all.length){ui.logMsg='V Game.log není žádný přijatý kontrakt.'}
+function handleLog(txt){const all=parseLog(txt),learned=learnFromLog(all),done=new Set(S.contracts.map(c=>c.mid).filter(Boolean));
+if(learned)save();const cand=all.filter(c=>!c.ended&&!done.has(c.id));ui.logMsg='';ui.logCands=null;
+if(!all.length){ui.logMsg='V Game.log není žádný přijatý hauling kontrakt.'}
 else if(!cand.length){ui.logMsg='Všechny aktivní kontrakty z Game.log už jsou načtené (nebo byly ukončené).'}
 else if(cand.length===1){ui.draft=draftFromLog(cand[0])}
-else ui.logCands=cand.slice(0,8);render()}
+else ui.logCands=cand.slice(0,10);render()}
 function contractForm(){const d=ui.draft;
 return`<div class="card"><h2 style="font-size:22px;margin-bottom:10px">${d.id?'Upravit kontrakt K'+C(d.id).no:d.mid?'Kontrakt z Game.log – zkontroluj a ulož':'Nový kontrakt'}</h2>${(d.hints||[]).length?d.hints.map(x=>`<div class="warn">${x}</div>`).join(''):''}
 <div class="row"><label>Zadavatel<select data-d="giver">${opts(GIVERS,d.giver)}</select></label><label>Typ<select data-d="type">${opts(TYPES,d.type)}</select></label>
@@ -425,6 +462,7 @@ function vNastaveni(){const nodeOpts=Object.entries(NODES);
 return`<div class="grid2"><div class="card"><h3 style="font-size:18px;margin-bottom:8px">Loď</h3><div class="row">
 <label>Název<input data-set="ship.name" value="${esc(S.ship.name)}"></label><label>Kapacita SCU<input type="number" data-set="ship.cap" value="${S.ship.cap}"></label>
 <label>Max box v gridu<select data-set="ship.maxBox">${opts(BOX.slice().reverse(),S.ship.maxBox)}</select></label></div></div>
+<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Vzhled</h3><label>Barevný režim<select data-set="set.theme">${opts([['system','Podle systému'],['light','Světlý'],['dark','Tmavý']],S.set.theme||'system')}</select></label><p class="small mute">„Podle systému“ se řídí nastavením světlého/tmavého režimu ve Windows.</p></div>
 <div class="card"><h3 style="font-size:18px;margin-bottom:8px">Výpočet trasy</h3><div class="row">
 <label>Rychlost QT (Gm/min)<input type="number" step="0.5" data-set="set.speed" value="${S.set.speed}"></label><label>Režie zastávky (min)<input type="number" data-set="set.stop" value="${S.set.stop}"></label><label>Příplatek povrch (min)<input type="number" data-set="set.surf" value="${S.set.surf}"></label></div>
 <p class="small mute">Režie = zarovnání, spool, přistání a obsluha výtahu. Příplatek povrch = let atmosférou k outpostu.</p></div>
@@ -441,7 +479,7 @@ ${TA()?`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Game.log<
 <button class="danger" data-act="reset">${ui.confirm==='reset'?'Opravdu vše smazat?':'Smazat všechna data'}</button></div></div></div>
 <p class="small mute">${TAURI?`Data se průběžně ukládají do souboru <code>${esc(dataPath)}</code>. Záloha se uloží do složky Dokumenty.`:'Data se ukládají jen v tomto prohlížeči na tomto zařízení. Pro přenos jinam nebo zálohu použij Stáhnout zálohu / Načíst ze souboru.'} Lokace, maximální boxy výtahů a vzdálenosti v Gm pocházejí z <a href="https://uexcorp.space" target="_blank" rel="noopener">UEX</a> (stav listopad 2026). Označení (E) = stanice s externím nákladním výtahem (podle UEX, pole loading dock). UEX uvádí Pyro IV a Pyro V na téže pozici, proto mají v trase nulovou vzdálenost.</p>`}
 
-function render(){header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni}[t];
+function render(){applyTheme();header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni}[t];
 document.getElementById('app').innerHTML=(ui.upd?`<div class="banner" style="background:var(--ok)">Je k dispozici nová verze ${esc(ui.upd.version)}${appVer?' (máš '+esc(appVer)+')':''}.<button data-act="updnow">${ui.updBusy?'Stahuji a instaluji…':'Aktualizovat a restartovat'}</button>${ui.updBusy?'':'<button data-act="updlater">Později</button>'}</div>`:'')+(S.sample?`<div class="banner">Ukázková data, aby bylo vidět, jak nástroj funguje.<button data-act="clearsample">Smazat a začít načisto</button></div>`:'')+V()}
 
 /* ukládání: localStorage + db artefaktu */
@@ -484,7 +522,8 @@ else if(a==='addline'){const p=ui.draft.lines[ui.draft.lines.length-1];ui.draft.
 else if(a==='delline'){ui.draft.lines.splice(i,1)}
 else if(a==='autobox'){const ln=ui.draft.lines[i];ln.boxes=autoBoxes(ln.scu,+ui.draft.maxBox||32)}
 else if(a==='cancelc'){ui.draft=null}
-else if(a==='savec'){const d=ui.draft;const lines=d.lines.filter(l=>+l.scu>0&&l.from&&l.to);if(!lines.length){b.textContent='Doplň aspoň jednu položku s SCU';return}
+else if(a==='savec'){const d=ui.draft;if(d.lines.some(l=>String(l.com||'').trim()&&!(+l.scu>0))){b.textContent='Doplň SCU u všech položek';return}const lines=d.lines.filter(l=>+l.scu>0&&l.from&&l.to);if(!lines.length){b.textContent='Doplň aspoň jednu položku s SCU';return}
+if(d.mid){S.posCat=S.posCat||{};for(const l of lines){if(l.pk&&l.from)S.posCat[l.pk]=l.from;if(l.dk&&l.to)S.posCat[l.dk]=l.to}}
 let c=d.id?C(d.id):null;if(!c){c={id:uid(),no:++S.seq,acc:Date.now(),status:'open'};S.contracts.push(c)}
 Object.assign(c,{giver:d.giver,type:d.type,reward:num(d.reward),maxBox:num(d.maxBox),limit:num(d.limit),server:d.server||'',note:d.note||'',mid:d.mid||c.mid||''});
 const keep=new Set();for(const l of lines){const body={cid:c.id,com:l.com||'Náklad',from:l.from,to:l.to,scu:+l.scu,boxes:Object.fromEntries(Object.entries(l.boxes||{}).filter(([,v])=>+v>0).map(([k,v])=>[k,+v]))};
