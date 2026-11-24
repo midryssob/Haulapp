@@ -1,6 +1,6 @@
 [package]
 name = "hauling-pyro"
-version = "1.3.0"
+version = "1.4.0"
 description = "Hauling Pyro – evidence nákladu a plánovač trasy pro Star Citizen"
 edition = "2021"
 

@@ -11,6 +11,7 @@ Neoficiální fanouškovský nástroj, bez vazby na Cloud Imperium Games ani Rob
 - Záloha jedním tlačítkem do složky Dokumenty, obnova z libovolného souboru zálohy.
 - **Načíst kontrakt z Game.log** (záložka Kontrakty): předvyplní zadavatele, typ, max. box a všechna místa nakládky i vykládky (i kontrakty typu *Multi→Single* a *Single→Multi*). Místa se poznají podle polohy značek; aplikace má výchozí katalog míst v Pyru a učí se další – z kontraktů, kde je log jmenuje, a z míst, která ručně opravíš. Množství SCU zapisuje hra jen u kontraktu, který byl při přijetí **sledovaný (tracked)**; u více nakládek uvádí jen celkový součet (aplikace ho rozdělí rovnoměrně k úpravě). Odměnu a časový limit hra do logu nezapisuje.
 - **Vzhled**: světlý, tmavý nebo podle nastavení Windows (Nastavení → Vzhled).
+- **Návod** (poslední záložka): popis všech funkcí, tipy a seznam změn ve verzích. Při vydání verze, která mění funkce, se aktualizuje i návod (konstanta `GUIDE_VER` a sekce „Změny ve verzích“ v `src/index.html`).
 
 ## Sestavení přes GitHub (bez instalace čehokoli na PC)
 1. Na github.com založ nový repozitář (třeba `hauling-pyro`).

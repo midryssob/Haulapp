@@ -83,6 +83,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .map .me{fill:none;stroke:var(--flare)}.map .clk{cursor:pointer}
 @media(prefers-reduced-motion:no-preference){.map .pulse{animation:pu 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes pu{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(1.8)}}}
 .seg{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.guide h2{font-size:22px;margin-bottom:8px}.guide ul,.guide ol{margin:6px 0;padding-left:22px}.guide li{margin:4px 0}.guide code{font-size:14px}
+.toc{display:flex;gap:6px;margin:10px 0 16px;padding-bottom:4px}.toc a{flex:none;padding:6px 12px;border:1px solid var(--line);border-radius:20px;text-decoration:none;color:var(--ink);font-size:14px;background:var(--panel)}
+.chg{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px}.chg dt{font:700 15px "Chakra Petch",sans-serif;color:var(--flare)}.chg dd{margin:0}
 @media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6.5em;margin-inline-start:-7em;color:var(--mute);font-size:12px}.stack td:empty{display:none}.stop{grid-template-columns:40px minmax(0,1fr)}.num{width:40px;height:40px;font-size:18px}.stop::before{left:18px;top:40px}}
 @media(prefers-reduced-motion:no-preference){.load .meter i,.top .meter i{transition:width .4s}}
 </style>
@@ -107,7 +110,7 @@ const TYPES=['Direct','Planetary','Solar','Interstellar'];
 const STATUS={open:'Aktivní',paid:'Odevzdáno',fail:'Selhalo',nospawn:'Nespawnulo',cancel:'Zrušeno'};
 const COMM=['Agricium','Aluminum','Beryl','Carbon','Copper','Corundum','Diamond','Gold','Hephaestanite','Hydrogen Fuel','Iron','Laranite','Medical Supplies','Pressurized Ice','Processed Food','Quantum Fuel','Quartz','Scrap','Ship Ammunition','Silicon','Stims','Tin','Titanium','Tungsten','Waste','Water'];
 const COLORS=['#e4572e','#2e86ab','#a23b72','#3b8f5a','#c79a1d','#6a4c93','#1b998b','#8d6346','#d1495b','#00798c'];
-const TABS=[['trasa','Trasa'],['kontrakty','Kontrakty'],['manifest','Manifest'],['zaznamy','Záznamy'],['nastaveni','Nastavení']];
+const TABS=[['trasa','Trasa'],['kontrakty','Kontrakty'],['manifest','Manifest'],['zaznamy','Záznamy'],['nastaveni','Nastavení'],['navod','Návod']];
 /* lokace: id, název, skupina, detail, kotva (uzel matice), max box výtahu (0 = neznámý), povrch */
 const LRAW=[
 ['ruin','Ruin Station','Stanice','Terminus · orbita','T',32,0,1],['orbit','Orbituary','Stanice','Bloom · orbita','BL',32,0,1],
@@ -318,7 +321,67 @@ return h}
 let appVer='';
 async function checkUpd(manual){const U=window.__TAURI__&&window.__TAURI__.updater;if(!U){if(manual)alertBox('Kontrola aktualizací není v této verzi dostupná.');return}
 try{const u=await U.check();if(u){ui.upd=u;render()}else if(manual)alertBox('Máš nejnovější verzi'+(appVer?' ('+appVer+')':'')+'.')}catch(e){if(manual)alertBox('Kontrolu aktualizací se nepodařilo provést: '+e)}}
-if(window.__TAURI__){try{window.__TAURI__.app.getVersion().then(v=>{appVer=v;if(tab()==='nastaveni')render()})}catch(e){}setTimeout(()=>checkUpd(false),4000)}
+if(window.__TAURI__){try{window.__TAURI__.app.getVersion().then(v=>{appVer=v;if(tab()==='nastaveni'||tab()==='navod')render()})}catch(e){}setTimeout(()=>checkUpd(false),4000)}
+
+/* ===== Návod – aktualizovat s každou verzí, která mění funkce ===== */
+const GUIDE_VER='1.4.0';
+function vNavod(){const desk=!!TA();const sec=(id,t,body)=>`<section class="card guide" id="g-${id}"><h2>${t}</h2>${body}</section>`;
+const toc=[['start','Rychlý start'],['kontrakty','Kontrakty'],['log','Načtení z Game.log'],['trasa','Trasa'],['mapa','Mapa'],['manifest','Manifest'],['zaznamy','Záznamy'],['nastaveni','Nastavení'],['limity','Tipy a omezení'],['zmeny','Změny ve verzích']];
+return`<div class="guide-head"><h2 style="font-size:28px">Návod k aplikaci Hauling Pyro</h2><p class="mute">Evidence hauling kontraktů a plánovač trasy pro Star Citizen, systém Pyro. Návod odpovídá verzi ${GUIDE_VER}${appVerTxt()}.</p>
+<nav class="scroll toc">${toc.map(([i,t])=>`<a href="#navod" data-act="gjump" data-id="g-${i}">${t}</a>`).join('')}</nav></div>
+${sec('start','Rychlý start',`<ol>
+<li>V <b>Nastavení</b> zadej svou loď: kapacitu v SCU a největší box, který pojme její nákladový grid.</li>
+<li>V záložce <b>Kontrakty</b> přidej přijaté kontrakty – ručně, nebo tlačítkem <b>Načíst sledovaný kontrakt</b> z Game.log.</li>
+<li>V záložce <b>Trasa</b> nastav, kde právě jsi. Aplikace sama spočítá nejrychlejší pořadí zastávek.</li>
+<li>Leť podle trasy. Na každé zastávce po naložení či vyložení klikni na <b>Hotovo, zapsat do záznamů</b> – trasa se přepočítá od místa, kde jsi.</li>
+<li>Po doručení odevzdej kontrakt v mobiGlasu a v aplikaci ho označ jako <b>Odevzdáno</b>.</li></ol>
+<p class="mute small">Ukázková data po první instalaci smažeš tlačítkem v oranžovém pruhu nahoře.</p>`)}
+${sec('kontrakty','Kontrakty',`<p>Kontrakt má zadavatele, typ (Direct / Planetary / Solar / Interstellar), odměnu, maximální velikost boxu, volitelný časový limit, server a poznámku. Obsahuje jednu nebo více <b>položek nákladu</b>: komodita, odkud, kam, množství SCU a rozpis boxů 1–32 SCU.</p>
+<ul><li><b>Rozpočítat boxy</b> navrhne rozpis podle maximální velikosti boxu kontraktu.</li>
+<li>U každého kontraktu vidíš, kolik je naloženo a vyloženo. Když je vše doručeno, aplikace připomene odevzdání.</li>
+<li><b>Stavy:</b> Aktivní, Odevzdáno, Selhalo, Nespawnulo, Zrušeno. Do trasy se počítají jen aktivní kontrakty; ostatní slouží pro statistiku.</li>
+<li>Smazání kontraktu vyžaduje druhé potvrzení a smaže i jeho záznamy.</li></ul>`)}
+${sec('log','Načtení kontraktu z Game.log',`<p>Hra zapisuje přijaté kontrakty do souboru <code>Game.log</code>. ${desk?'Desktopová aplikace ho přečte sama tlačítkem <b>Načíst sledovaný kontrakt</b> (cestu k souboru nastavíš v Nastavení).':'Ve webové verzi soubor vybereš tlačítkem <b>Načíst sledovaný kontrakt z Game.log</b> (je ve složce hry <code>StarCitizen\\LIVE</code>).'} Aplikace soubor jen čte.</p>
+<ul><li>Načte zadavatele, typ, odhad maximálního boxu a <b>všechna místa nakládky i vykládky</b> – i u kontraktů s více nakládkami (Multi→Single) a více vykládkami (Single→Multi).</li>
+<li>Místa pozná podle polohy značek v logu. Má výchozí katalog míst v Pyru a <b>učí se</b>: z kontraktů, kde log místo jmenuje, a z míst, která ve formuláři ručně opravíš.</li>
+<li>Množství SCU hra zapisuje jen u kontraktu, který byl <b>při přijetí sledovaný (tracked)</b>. U nesledovaného kontraktu doplníš SCU ručně – bez nich kontrakt nejde uložit.</li>
+<li>U více nakládek uvádí log jen celkový součet; aplikace ho rozdělí rovnoměrně a ty ho upravíš podle mobiGlasu.</li>
+<li><b>Odměnu a časový limit</b> hra do logu nezapisuje – doplň je ručně.</li>
+<li>Formulář vždy zvýrazní, co je odhad nebo co chybí. Jeden kontrakt nejde načíst dvakrát; když je v logu víc nových kontraktů, aplikace nabídne výběr.</li></ul>`)}
+${sec('trasa','Trasa',`<p>Aplikace hledá pořadí zastávek s <b>nejkratším časem</b>. Hlídá, aby se náklad naložil dřív, než se vykládá, a aby se nepřekročila kapacita lodi. Na každé zastávce se nejdřív vykládá, pak nakládá. Náklad, který se nevejde najednou, rozdělí na víc jízd.</p>
+<ul><li><b>Kde teď jsem</b> – výchozí bod trasy. Mění se sám po potvrzení zastávky nebo ručním záznamu; jde změnit i kliknutím na stanici v mapě.</li>
+<li><b>Konec trasy</b> – volitelné místo, kde chceš skončit.</li>
+<li>U každé zastávky: co <b>VYLOŽIT</b> a <b>NALOŽIT</b>, vzdálenost v Gm, odhad času a zaplnění nákladového prostoru po zastávce.</li>
+<li>Nahoře je souhrn a úspora času proti plnění kontraktů jeden po druhém.</li>
+<li>Do 12 položek je výpočet přesný, u větších zakázek přibližný (heuristika).</li>
+<li><b>Varování</b>: box se nevejde do gridu lodi, výtah na místě nebere tak velké boxy, blíží se časový limit, rozpis boxů nesedí s množstvím.</li></ul>
+<p class="small mute">Čas = vzdálenost ÷ rychlost quantum skoku + režie zastávky (+ příplatek za přistání na povrchu). Parametry nastavíš v Nastavení.</p>`)}
+${sec('mapa','Mapa systému',`<ul><li>Pulzující kroužek = tvoje poloha, oranžová čára = zbývající trasa s čísly zastávek, čárkovaně = kudy jsi letěl.</li>
+<li>Pohledy <b>Trasa</b> (přiblížení na trasu), <b>Vnitřní planety</b> a <b>Celý systém</b>.</li>
+<li>Klepnutím na stanici nastavíš svou polohu.</li>
+<li><b>(E)</b> u názvu = stanice s externím nákladním výtahem.</li></ul>
+<p class="small mute">Polohy jsou dopočítané ze vzdáleností UEX; Nyx Gateway je umístěná odhadem.</p>`)}
+${sec('manifest','Manifest',`<p>Co je právě na palubě, seskupené a barevně odlišené podle cílové destinace. Ukazuje volné místo a součet boxů podle velikosti.</p>`)}
+${sec('zaznamy','Záznamy a statistiky',`<ul><li>Chronologický log naložení, vyložení a <b>ztrát</b> (např. když autoload „ztratí“ náklad). Ze záznamů se počítá stav nákladu i trasa.</li>
+<li>Ruční záznam přidáš formulářem; chybný záznam smažeš křížkem.</li>
+<li>Statistiky: vyplacené aUEC, odevzdané kontrakty, vyložené SCU, ztráty, počet nespawnutých kontraktů a výdělek podle zadavatele.</li></ul>`)}
+${sec('nastaveni','Nastavení',`<ul><li><b>Loď</b> – název, kapacita SCU a největší box v gridu.</li>
+<li><b>Vzhled</b> – světlý, tmavý, nebo podle nastavení Windows.</li>
+<li><b>Výpočet trasy</b> – rychlost quantum skoku, režie zastávky a příplatek za povrch.</li>
+<li><b>Vlastní lokace</b> – doplníš místo, které v seznamu chybí (nejbližší těleso, povrch, externí výtah, max. box).</li>
+${desk?'<li><b>Aplikace</b> – číslo verze a ruční kontrola aktualizací. Nové verze se hledají i automaticky při spuštění; aktualizace se po potvrzení sama stáhne, nainstaluje a aplikaci restartuje.</li><li><b>Game.log</b> – cesta k souboru logu hry.</li>':''}
+<li><b>Záloha dat</b> – ${desk?'uložení zálohy do složky Dokumenty':'stažení zálohy'}, kopírování do schránky a obnova ze souboru. ${desk?'Data se průběžně ukládají do souboru v počítači.':'Data jsou uložená v prohlížeči – zálohuj je.'}</li></ul>`)}
+${sec('limity','Tipy a omezení',`<ul><li>Vzdálenosti, seznam výtahů a jejich max. boxy jsou z UEX (Powered by UEX) a jsou přibližné. UEX vede Pyro IV a Pyro V na stejné pozici.</li>
+<li>Formát Game.log se může s patchem hry změnit. Když načítání přestane fungovat, je potřeba aktualizace aplikace.</li>
+${desk?'<li>Okno aplikace lze mít vedle hry – hru spusť v režimu <i>Borderless</i>.</li><li>Při prvním spuštění instalátoru může Windows SmartScreen zobrazit varování; zvol <i>Další informace → Přesto spustit</i>.</li>':''}
+<li>Neoficiální fanouškovský nástroj, bez vazby na Cloud Imperium Games.</li></ul>`)}
+${sec('zmeny','Změny ve verzích',`<dl class="chg">
+<dt>1.4.0</dt><dd>Záložka Návod s popisem funkcí a seznamem změn.</dd>
+<dt>1.3.0</dt><dd>Načtení všech míst nakládky i vykládky z Game.log (Multi→Single, Single→Multi, nesledované kontrakty), katalog poloh, který se učí. Volba vzhledu: světlý / tmavý / podle systému.</dd>
+<dt>1.2.0</dt><dd>Automatické aktualizace desktopové aplikace.</dd>
+<dt>1.1.0</dt><dd>Načtení sledovaného kontraktu z Game.log.</dd>
+<dt>1.0.0</dt><dd>První vydání: kontrakty, výpočet trasy, mapa Pyro, manifest, záznamy, okno navrchu, záloha dat.</dd></dl>`)}`}
+const appVerTxt=()=>typeof appVer!=='undefined'&&appVer?` (nainstalovaná verze ${esc(appVer)})`:'';
 /* ===== Import kontraktu z Game.log ===== */
 const GLOG_DEFAULT='C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\Game.log';
 const TA=()=>window.__TAURI__&&window.__TAURI__.core;
@@ -479,7 +542,7 @@ ${TA()?`<div class="card"><h3 style="font-size:18px;margin-bottom:8px">Game.log<
 <button class="danger" data-act="reset">${ui.confirm==='reset'?'Opravdu vše smazat?':'Smazat všechna data'}</button></div></div></div>
 <p class="small mute">${TAURI?`Data se průběžně ukládají do souboru <code>${esc(dataPath)}</code>. Záloha se uloží do složky Dokumenty.`:'Data se ukládají jen v tomto prohlížeči na tomto zařízení. Pro přenos jinam nebo zálohu použij Stáhnout zálohu / Načíst ze souboru.'} Lokace, maximální boxy výtahů a vzdálenosti v Gm pocházejí z <a href="https://uexcorp.space" target="_blank" rel="noopener">UEX</a> (stav listopad 2026). Označení (E) = stanice s externím nákladním výtahem (podle UEX, pole loading dock). UEX uvádí Pyro IV a Pyro V na téže pozici, proto mají v trase nulovou vzdálenost.</p>`}
 
-function render(){applyTheme();header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni}[t];
+function render(){applyTheme();header();const t=tab();const V={trasa:vTrasa,kontrakty:vKontrakty,manifest:vManifest,zaznamy:vZaznamy,nastaveni:vNastaveni,navod:vNavod}[t];
 document.getElementById('app').innerHTML=(ui.upd?`<div class="banner" style="background:var(--ok)">Je k dispozici nová verze ${esc(ui.upd.version)}${appVer?' (máš '+esc(appVer)+')':''}.<button data-act="updnow">${ui.updBusy?'Stahuji a instaluji…':'Aktualizovat a restartovat'}</button>${ui.updBusy?'':'<button data-act="updlater">Později</button>'}</div>`:'')+(S.sample?`<div class="banner">Ukázková data, aby bylo vidět, jak nástroj funguje.<button data-act="clearsample">Smazat a začít načisto</button></div>`:'')+V()}
 
 /* ukládání: localStorage + db artefaktu */
@@ -543,6 +606,7 @@ else if(a==='logpick'){const c=(ui.logCands||[]).find(x=>x.id===id);if(c){ui.dra
 else if(a==='updnow'&&ui.upd&&!ui.updBusy){ui.updBusy=true;render();save();ui.upd.downloadAndInstall().then(()=>window.__TAURI__.process.relaunch()).catch(e=>{ui.updBusy=false;ui.upd=null;alertBox('Aktualizace se nezdařila: '+e)});return}
 else if(a==='updlater'){ui.upd=null}
 else if(a==='updcheck'){b.textContent='Kontroluji…';checkUpd(true).then(()=>{b.textContent='Zkontrolovat aktualizace'});return}
+else if(a==='gjump'){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});return}
 else if(a==='dellog'){S.log=S.log.filter(x=>x.id!==id);save()}
 else if(a==='addloc'){const f=ui.logForm;if(!f.cl_n){b.textContent='Zadej název';return}S.customLocs=S.customLocs||[];S.customLocs.push({id:'u'+uid(),n:f.cl_n,d:NODES[f.cl_a||'BL'],a:f.cl_a||'BL',x:+f.cl_x||0,s:!!f.cl_s,e:!!f.cl_e});ui.logForm={};save()}
 else if(a==='delloc'){S.customLocs=S.customLocs.filter(l=>l.id!==id);save()}
